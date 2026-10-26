@@ -1,0 +1,724 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Marginalia</title>
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-title" content="Marginalia">
+<meta name="apple-mobile-web-app-status-bar-style" content="default">
+<meta name="theme-color" content="#FDFBF7" media="(prefers-color-scheme: light)">
+<meta name="theme-color" content="#1C1917" media="(prefers-color-scheme: dark)">
+<link rel="apple-touch-icon" href="apple-touch-icon.png">
+<link rel="icon" type="image/png" href="icon-192.png">
+<link rel="manifest" href="manifest.json">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Playfair+Display:ital,wght@0,600;0,700;1,400&display=swap" rel="stylesheet">
+<style>
+[hidden] { display: none !important }
+img { max-width: 100% }
+/* Layout: single phone-width column, sticky header, card list, bottom tab bar */
+:root {
+  --bg: #F7F4EB; --surface: #FDFBF7; --card: #FFFFFF; --line: #E7E0CC; --line-strong: #D9CFB2;
+  --fg: #2C2723; --muted: #7A7064; --accent: #B45309; --accent-ink: #FFFFFF; --accent-soft: #FBEBD3;
+  --good: #047857; --good-soft: #DDF3E8; --warn: #92400E; --warn-soft: #FDF0D5; --bad: #B42318; --bad-soft: #FDE8E6;
+  --scrim: rgba(28,25,23,.55);
+  --serif: "Playfair Display", Georgia, "Times New Roman", serif;
+  --sans: "Inter", -apple-system, "Segoe UI", Roboto, sans-serif;
+  --mono: ui-monospace, "SF Mono", Menlo, monospace;
+}
+@media (prefers-color-scheme: dark) { :root:not([data-theme="light"]) {
+  --bg: #12100E; --surface: #1C1917; --card: #24201C; --line: #34302A; --line-strong: #463F36;
+  --fg: #EFEAD8; --muted: #A99F8E; --accent: #E08A2C; --accent-ink: #1C1917; --accent-soft: #3A2A16;
+  --good: #5FD3A0; --good-soft: #143326; --warn: #F2B866; --warn-soft: #3A2A12; --bad: #F48B80; --bad-soft: #3D1A17;
+  --scrim: rgba(0,0,0,.65); color-scheme: dark } }
+:root[data-theme="dark"] {
+  --bg: #12100E; --surface: #1C1917; --card: #24201C; --line: #34302A; --line-strong: #463F36;
+  --fg: #EFEAD8; --muted: #A99F8E; --accent: #E08A2C; --accent-ink: #1C1917; --accent-soft: #3A2A16;
+  --good: #5FD3A0; --good-soft: #143326; --warn: #F2B866; --warn-soft: #3A2A12; --bad: #F48B80; --bad-soft: #3D1A17;
+  --scrim: rgba(0,0,0,.65); color-scheme: dark }
+
+* { box-sizing: border-box }
+html, body { margin: 0 }
+body { background: var(--bg); padding-top: env(safe-area-inset-top, 0px); color: var(--fg); font-family: var(--sans); -webkit-tap-highlight-color: transparent }
+html, body { min-height: 100% }
+.app { max-width: 30rem; margin: 0 auto; min-height: 100dvh; background: var(--surface); border-inline: 1px solid var(--line); padding-bottom: 5.5rem }
+button, input, textarea, select { font: inherit; color: inherit }
+button { cursor: pointer }
+:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px }
+
+body::before { content: ""; position: fixed; inset: 0 0 auto; height: env(safe-area-inset-top, 0px); z-index: 10; background: var(--surface) }
+header { position: sticky; top: env(safe-area-inset-top, 0px); z-index: 5; background: var(--surface); border-bottom: 1px solid var(--line);
+  padding-block: .8rem; padding-left: max(16px, env(safe-area-inset-left, 0px)); padding-right: max(16px, env(safe-area-inset-right, 0px));
+  display: flex; align-items: center; justify-content: space-between; gap: .75rem }
+.brand { display: flex; align-items: center; gap: .5rem }
+.brand h1 { margin: 0; font-family: var(--serif); font-weight: 700; font-size: 1.3rem; letter-spacing: -.01em }
+.brand svg.logo { width: 1.5rem; height: 1.5rem; color: var(--accent) }
+.head-actions { display: flex; gap: .25rem }
+.iconbtn { border: 0; background: transparent; padding: .45rem; border-radius: 999px; color: var(--fg); display: inline-flex }
+.iconbtn:hover { background: var(--accent-soft) }
+svg.i { width: 1.15rem; height: 1.15rem; fill: none; stroke: currentColor; stroke-width: 2; stroke-linecap: round; stroke-linejoin: round }
+
+main { padding-block: 1rem 1.5rem; padding-left: max(16px, env(safe-area-inset-left, 0px)); padding-right: max(16px, env(safe-area-inset-right, 0px)); display: flex; flex-direction: column; gap: .9rem }
+
+.addbar { display: flex; gap: .4rem; align-items: center; background: var(--card); border: 1px solid var(--line); border-radius: 1rem; padding: .35rem; box-shadow: 0 1px 2px rgba(44,39,35,.05) }
+.addbar input { flex: 1; min-width: 0; border: 0; background: transparent; padding: .35rem .6rem; font-size: 16px; font-weight: 500 }
+.addbar input::placeholder { color: var(--muted); font-weight: 400 }
+.cambtn { border: 0; background: var(--bg); border-radius: .7rem; width: 2.2rem; height: 2.2rem; display: inline-flex; align-items: center; justify-content: center; flex-shrink: 0 }
+.cambtn svg.i { width: 1rem; height: 1rem }
+.lookup { padding: .5rem .8rem; font-size: .78rem }
+.lookup svg.i { width: .85rem; height: .85rem }
+.addbar input:focus { outline: none }
+.btn { border: 1px solid transparent; border-radius: .75rem; padding: .55rem .9rem; font-size: .8rem; font-weight: 600; display: inline-flex; align-items: center; gap: .35rem; white-space: nowrap }
+.btn-primary { background: var(--accent); color: var(--accent-ink) }
+.btn-ghost { background: transparent; border-color: var(--line-strong) }
+.btn-soft { background: var(--accent-soft); color: var(--accent) }
+.btn:disabled { opacity: .55; cursor: default }
+
+.filters { display: flex; gap: .4rem; align-items: center }
+.searchwrap { flex: 1 1 0; min-width: 0; position: relative }
+.searchwrap svg.i { position: absolute; left: .55rem; top: 50%; transform: translateY(-50%); width: .85rem; height: .85rem; color: var(--muted); pointer-events: none }
+.filters input, .filters select { background: var(--bg); border: 1px solid var(--line); border-radius: .7rem; padding: .4rem .55rem; font-size: .75rem; font-weight: 500 }
+.filters input { width: 100%; padding-left: 1.8rem; font-weight: 400 }
+.filters select { flex: 0 1 auto; max-width: 7.5rem; min-width: 0 }
+.meta { display: flex; justify-content: space-between; align-items: center; font-size: .75rem; color: var(--muted); padding-inline: .2rem }
+.linkbtn { border: 0; background: none; color: var(--muted); font-size: .75rem; padding: 0 }
+.linkbtn:hover { color: var(--accent) }
+
+.list { display: flex; flex-direction: column; gap: .7rem }
+.word { background: var(--card); border: 1px solid var(--line); border-radius: 1rem; padding: .9rem 1rem; display: flex; flex-direction: column; gap: .45rem; min-width: 0 }
+.word-top { display: flex; justify-content: space-between; align-items: flex-start; gap: .5rem }
+.word-name { display: flex; flex-wrap: wrap; align-items: baseline; gap: .4rem; min-width: 0 }
+.word h3 { margin: 0; font-family: var(--serif); font-weight: 700; font-size: 1.25rem; color: var(--accent); overflow-wrap: anywhere; text-transform: capitalize }
+.pos { font-size: .68rem; font-style: italic; color: var(--muted); background: var(--bg); border-radius: .35rem; padding: .1rem .4rem }
+.phon { font-family: var(--mono); font-size: .72rem; color: var(--muted) }
+.actions { display: flex; align-items: center; gap: .1rem; flex-shrink: 0 }
+.actions .iconbtn { padding: .35rem; color: var(--muted) }
+.actions .iconbtn svg.i { width: .95rem; height: .95rem }
+.pill { font-size: .6rem; font-weight: 700; letter-spacing: .08em; text-transform: uppercase; border-radius: 999px; padding: .15rem .5rem }
+.pill.LEARNING { background: var(--warn-soft); color: var(--warn) }
+.pill.MASTERED { background: var(--good-soft); color: var(--good) }
+.def { margin: 0; font-size: .85rem; line-height: 1.5 }
+.ctx { margin: 0; font-family: var(--serif); font-style: italic; font-size: .8rem; line-height: 1.5; color: var(--muted); background: var(--surface); border-left: 2px solid var(--accent); border-radius: 0 .5rem .5rem 0; padding: .3rem .6rem .3rem .7rem }
+.foot { display: flex; justify-content: space-between; align-items: center; gap: .5rem; flex-wrap: wrap; border-top: 1px solid var(--line); padding-top: .45rem; font-size: .68rem; font-weight: 500; color: var(--muted) }
+.tags { display: flex; gap: .25rem; flex-wrap: wrap }
+.tag { background: var(--bg); border-radius: .3rem; padding: .05rem .35rem }
+
+.empty { text-align: center; padding: 2.5rem 1rem; color: var(--muted); display: flex; flex-direction: column; align-items: center; gap: .6rem }
+.empty h2 { margin: 0; font-family: var(--serif); color: var(--fg); font-size: 1.25rem; text-wrap: balance }
+.empty p { margin: 0; max-width: 22rem; font-size: .85rem; line-height: 1.5 }
+.banner { background: var(--bad-soft); color: var(--bad); border-radius: .8rem; padding: .7rem .85rem; font-size: .8rem; line-height: 1.45 }
+.loading { color: var(--muted); font-size: .85rem; text-align: center; padding: 2rem 0 }
+
+/* Flashcards */
+.review { display: flex; flex-direction: column; gap: 1rem }
+.progress { display: flex; flex-direction: column; gap: .35rem; font-size: .75rem; color: var(--muted) }
+.progress-row { display: flex; justify-content: space-between; font-variant-numeric: tabular-nums }
+.bar { height: 6px; background: var(--line); border-radius: 999px; overflow: hidden }
+.bar > div { height: 100%; background: var(--accent); width: 0; transition: width .3s }
+.card-wrap { perspective: 1000px; height: 21rem }
+.card-inner { position: relative; height: 100%; transition: transform .5s; transform-style: preserve-3d; cursor: pointer }
+.card-inner.flipped { transform: rotateY(180deg) }
+.face { position: absolute; inset: 0; backface-visibility: hidden; -webkit-backface-visibility: hidden; border-radius: 1.5rem; border: 1px solid var(--line); padding: 1.4rem; display: flex; flex-direction: column; overflow-y: auto }
+.front { background: var(--card); align-items: center; justify-content: space-between; text-align: center }
+.back { background: var(--bg); transform: rotateY(180deg); gap: .8rem }
+.front .row { width: 100%; display: flex; justify-content: space-between; font-size: .72rem; color: var(--muted); gap: .5rem }
+.front .row span:first-child { font-style: italic; overflow: hidden; text-overflow: ellipsis; white-space: nowrap }
+.front h2 { margin: 0; font-family: var(--serif); font-size: 2.2rem; color: var(--accent); overflow-wrap: anywhere }
+.hint { font-size: .72rem; color: var(--muted) }
+.label { font-size: .62rem; font-weight: 600; letter-spacing: .1em; text-transform: uppercase; color: var(--muted); margin: 0 0 .2rem }
+.back-head { display: flex; justify-content: space-between; align-items: center; border-bottom: 1px solid var(--line); padding-bottom: .5rem }
+.back-head strong { font-family: var(--serif); font-size: 1.25rem }
+.review-actions { display: grid; grid-template-columns: 1fr 1fr; gap: .6rem }
+.review-actions .btn { justify-content: center; padding: .8rem; border-radius: 1rem; font-size: .82rem }
+.btn-learning { background: var(--bad-soft); color: var(--bad) }
+.btn-mastered { background: var(--good-soft); color: var(--good) }
+
+nav.tabs { position: fixed; bottom: 0; left: 50%; transform: translateX(-50%); width: 100%; max-width: 30rem; background: var(--surface); border-top: 1px solid var(--line);
+  display: flex; justify-content: space-around; padding-top: .45rem; padding-bottom: calc(.45rem + env(safe-area-inset-bottom, 0px));
+  padding-left: max(16px, env(safe-area-inset-left, 0px)); padding-right: max(16px, env(safe-area-inset-right, 0px)); z-index: 6 }
+nav.tabs button { border: 0; background: none; display: flex; flex-direction: column; align-items: center; gap: .15rem; font-size: .65rem; font-weight: 500; color: var(--muted); padding: .2rem 1rem }
+nav.tabs button[aria-current="page"] { color: var(--accent) }
+
+/* Sheets */
+.sheet-scrim { position: fixed; inset: 0; background: var(--scrim); z-index: 20; display: flex; align-items: flex-end; justify-content: center }
+.sheet { background: var(--surface); width: 100%; max-width: 30rem; max-height: 92%; overflow-y: auto; border-radius: 1.4rem 1.4rem 0 0; border: 1px solid var(--line);
+  padding-block: 1.1rem calc(1.1rem + env(safe-area-inset-bottom, 0px)); padding-left: max(18px, env(safe-area-inset-left, 0px)); padding-right: max(18px, env(safe-area-inset-right, 0px));
+  display: flex; flex-direction: column; gap: .9rem }
+.sheet-head { display: flex; justify-content: space-between; align-items: center; border-bottom: 1px solid var(--line); padding-bottom: .6rem }
+.sheet-head h3 { margin: 0; font-family: var(--serif); font-size: 1.15rem }
+#wordForm { display: flex; flex-direction: column; gap: .7rem; font-size: .8rem }
+.field { display: flex; flex-direction: column; gap: .3rem; min-width: 0 }
+.field label { font-weight: 600; color: var(--muted); font-size: .72rem }
+.field input, .field textarea, .field select { background: var(--card); border: 1px solid var(--line-strong); border-radius: .7rem; padding: .55rem .7rem; font-size: .9rem; width: 100%; min-width: 0 }
+.field textarea { resize: vertical; line-height: 1.45 }
+.field textarea.serif { font-family: var(--serif); font-style: italic }
+.grid2 { display: grid; grid-template-columns: 1fr 1fr; gap: .6rem }
+.grid3 { display: grid; grid-template-columns: 2fr 1fr; gap: .6rem }
+.inline { display: flex; gap: .45rem }
+.inline input { flex: 1 }
+.status-line { font-size: .75rem; color: var(--muted); min-height: 1em }
+.status-line.err { color: var(--bad) }
+.form-actions { display: flex; justify-content: flex-end; gap: .5rem; padding-top: .3rem }
+.panel { background: var(--bg); border-radius: .9rem; padding: .85rem; display: flex; flex-direction: column; gap: .45rem; font-size: .8rem }
+.panel p { margin: 0; color: var(--muted); line-height: 1.45 }
+.panel strong { color: var(--fg) }
+.confirm { display: flex; gap: .4rem; align-items: center; font-size: .75rem; color: var(--bad) }
+.scan-preview { max-height: 14rem; object-fit: contain; border-radius: .8rem; border: 1px solid var(--line); background: var(--card) }
+.chips { display: flex; flex-wrap: wrap; gap: .4rem }
+.chip { border: 1px solid var(--line-strong); background: var(--card); border-radius: 999px; padding: .4rem .8rem; font-family: var(--serif); font-size: .95rem }
+.chip:hover { border-color: var(--accent); color: var(--accent) }
+@media (prefers-reduced-motion: reduce) { .card-inner, .bar > div { transition: none } }
+@media (max-width: 360px) { .grid2, .grid3 { grid-template-columns: 1fr } }
+
+.auth { display: flex; flex-direction: column; gap: .8rem; padding-block: 2.5rem 1rem }
+.auth h2 { margin: 0; font-family: var(--serif); font-size: 1.5rem; text-wrap: balance }
+.auth p { margin: 0; color: var(--muted); font-size: .85rem; line-height: 1.5 }
+.auth .field input { font-size: 16px }
+.auth .btn { justify-content: center; padding: .75rem }
+.suggest { display: flex; flex-wrap: wrap; gap: .35rem; align-items: center; font-size: .75rem; color: var(--muted) }
+.suggest button { border: 1px solid var(--line-strong); background: var(--card); border-radius: 999px; padding: .2rem .6rem; font-size: .8rem }
+.source { font-size: .65rem; color: var(--muted) }
+</style>
+</head>
+<body>
+<svg width="0" height="0" style="position:absolute" aria-hidden="true">
+  <symbol id="i-gear" viewBox="0 0 24 24"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 1 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 1 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 1 1-2.83-2.83l.06-.06A1.65 1.65 0 0 0 4.6 15a1.65 1.65 0 0 0-1.51-1H3a2 2 0 1 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 1 1 2.83-2.83l.06.06A1.65 1.65 0 0 0 9 4.6a1.65 1.65 0 0 0 1-1.51V3a2 2 0 1 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 1 1 2.83 2.83l-.06.06A1.65 1.65 0 0 0 19.4 9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 1 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"/></symbol>
+  <symbol id="i-camera" viewBox="0 0 24 24"><path d="M23 19a2 2 0 0 1-2 2H3a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h4l2-3h6l2 3h4a2 2 0 0 1 2 2z"/><circle cx="12" cy="13" r="4"/></symbol>
+  <symbol id="i-edit" viewBox="0 0 24 24"><path d="M12 20h9"/><path d="M16.5 3.5a2.1 2.1 0 0 1 3 3L7 19l-4 1 1-4z"/></symbol>
+  <symbol id="i-trash" viewBox="0 0 24 24"><path d="M3 6h18"/><path d="M8 6V4h8v2"/><path d="M19 6l-1 14H6L5 6"/></symbol>
+  <symbol id="i-x" viewBox="0 0 24 24"><path d="M18 6 6 18M6 6l12 12"/></symbol>
+  <symbol id="i-book" viewBox="0 0 24 24"><path d="M2 4h6a4 4 0 0 1 4 4v13a3 3 0 0 0-3-3H2z"/><path d="M22 4h-6a4 4 0 0 0-4 4v13a3 3 0 0 1 3-3h7z"/></symbol>
+  <symbol id="i-layers" viewBox="0 0 24 24"><path d="m12 2 10 5-10 5L2 7z"/><path d="m2 17 10 5 10-5"/><path d="m2 12 10 5 10-5"/></symbol>
+  <symbol id="i-speaker" viewBox="0 0 24 24"><path d="M11 5 6 9H2v6h4l5 4z"/><path d="M15.5 8.5a5 5 0 0 1 0 7"/><path d="M19 5a10 10 0 0 1 0 14"/></symbol>
+  <symbol id="i-moon" viewBox="0 0 24 24"><path d="M21 12.8A9 9 0 1 1 11.2 3a7 7 0 0 0 9.8 9.8z"/></symbol>
+  <symbol id="i-sun" viewBox="0 0 24 24"><circle cx="12" cy="12" r="4"/><path d="M12 2v2M12 20v2M4.9 4.9l1.4 1.4M17.7 17.7l1.4 1.4M2 12h2M20 12h2M4.9 19.1l1.4-1.4M17.7 6.3l1.4-1.4"/></symbol>
+  <symbol id="i-arrow" viewBox="0 0 24 24"><path d="M5 12h14M13 6l6 6-6 6"/></symbol>
+  <symbol id="i-search" viewBox="0 0 24 24"><circle cx="11" cy="11" r="7"/><path d="m20 20-3.5-3.5"/></symbol>
+  <symbol id="i-library" viewBox="0 0 24 24"><path d="M5 4v16M9 4v16M13 4v16M17 4l3 16"/></symbol>
+  <symbol id="i-sort" viewBox="0 0 24 24"><path d="m3 16 4 4 4-4M7 20V4M21 8l-4-4-4 4M17 4v16"/></symbol>
+</svg>
+
+<div class="app">
+  <header>
+    <div class="brand"><svg class="i logo"><use href="#i-book"/></svg><h1>Marginalia</h1></div>
+    <div class="head-actions">
+      <button class="iconbtn" id="themeBtn" aria-label="Toggle dark mode"><svg class="i"><use href="#i-moon" id="themeIcon"/></svg></button>
+      <button class="iconbtn" id="openSettings" aria-label="Settings" hidden><svg class="i"><use href="#i-gear"/></svg></button>
+    </div>
+  </header>
+
+  <main>
+    <div id="banner" class="banner" hidden></div>
+
+    <section id="authView" class="auth" hidden>
+      <h2 id="authTitle">Sign in to your library</h2>
+      <p id="authHint">Your words are saved to your own database and sync across your phone and laptop.</p>
+      <form id="authForm" autocomplete="on" style="display:flex;flex-direction:column;gap:.7rem">
+        <div class="field"><label for="authEmail">Email</label><input id="authEmail" type="email" autocomplete="email" required></div>
+        <div class="field"><label for="authPass">Password</label><input id="authPass" type="password" autocomplete="current-password" minlength="6" required></div>
+        <button class="btn btn-primary" id="authSubmit" type="submit">Sign in</button>
+      </form>
+      <div class="status-line" id="authStatus"></div>
+      <button class="linkbtn" id="authToggle" style="align-self:center">New here? Create an account</button>
+    </section>
+
+    <section id="libraryView" style="display:flex;flex-direction:column;gap:.9rem" hidden>
+      <form id="quickForm" class="addbar" autocomplete="off">
+        <input id="quickInput" type="text" placeholder="Add word..." aria-label="Word to add" autocapitalize="none" autocorrect="off">
+        <button type="button" class="cambtn" id="scanBtn" aria-label="Scan a photo of the Kobo screen"><svg class="i"><use href="#i-camera"/></svg></button>
+        <button type="submit" class="btn btn-primary lookup">Lookup <svg class="i"><use href="#i-arrow"/></svg></button>
+      </form>
+
+      <div class="filters">
+        <div class="searchwrap"><svg class="i"><use href="#i-search"/></svg><input id="searchInput" type="search" placeholder="Search..." aria-label="Search"></div>
+        <select id="bookFilter" aria-label="Filter by book"><option value="ALL">All Books</option></select>
+        <select id="statusFilter" aria-label="Filter by status">
+          <option value="ALL">All Status</option><option value="LEARNING">Learning</option><option value="MASTERED">Mastered</option>
+        </select>
+      </div>
+
+      <div class="meta">
+        <span id="counter">Loading…</span>
+        <button class="linkbtn" id="sortBtn">Sort: Newest ⇅</button>
+      </div>
+
+      <div id="list" class="list"><div class="loading">Opening your library…</div></div>
+
+      <div id="empty" class="empty" hidden>
+        <svg class="i" style="width:2rem;height:2rem;color:var(--accent)"><use href="#i-book"/></svg>
+        <h2>No words yet</h2>
+        <p>Type a word you highlighted on your Kobo, or snap a photo of the page. The definition fills in automatically.</p>
+        <button class="btn btn-soft" id="seedBtn">Add two example words</button>
+      </div>
+    </section>
+
+    <section id="reviewView" class="review" hidden>
+      <div class="progress">
+        <div class="progress-row"><span id="reviewLabel">Learning words first</span><span id="reviewCount">0 / 0</span></div>
+        <div class="bar"><div id="bar"></div></div>
+      </div>
+      <div class="card-wrap">
+        <div class="card-inner" id="card" tabindex="0" role="button" aria-label="Flip card">
+          <div class="face front">
+            <div class="row"><span id="fBook"></span><span id="fStatus" class="pill"></span></div>
+            <div><h2 id="fWord"></h2><div class="phon" id="fPhon"></div></div>
+            <div class="hint">Tap to see the definition and your Kobo sentence</div>
+          </div>
+          <div class="face back">
+            <div class="back-head">
+              <div><strong id="bWord"></strong> <span class="pos" id="bPos"></span></div>
+              <button class="iconbtn" id="speakBtn" aria-label="Pronounce"><svg class="i"><use href="#i-speaker"/></svg></button>
+            </div>
+            <div><p class="label">Definition</p><p class="def" id="bDef"></p></div>
+            <div id="bCtxWrap"><p class="label">From your book</p><p class="ctx" id="bCtx"></p></div>
+          </div>
+        </div>
+      </div>
+      <div class="review-actions">
+        <button class="btn btn-learning" id="learningBtn">Still learning</button>
+        <button class="btn btn-mastered" id="masteredBtn">Mastered</button>
+      </div>
+    </section>
+  </main>
+
+  <nav class="tabs" id="tabs" hidden>
+    <button id="tabLibrary" aria-current="page"><svg class="i"><use href="#i-library"/></svg>Vocabulary</button>
+    <button id="tabReview"><svg class="i"><use href="#i-layers"/></svg>Flashcards</button>
+  </nav>
+</div>
+
+<!-- Add / edit sheet -->
+<div class="sheet-scrim" id="wordSheet" hidden>
+  <div class="sheet" role="dialog" aria-modal="true" aria-labelledby="sheetTitle">
+    <div class="sheet-head"><h3 id="sheetTitle">Add word</h3><button class="iconbtn" data-close="wordSheet" aria-label="Close"><svg class="i"><use href="#i-x"/></svg></button></div>
+    <form id="wordForm" autocomplete="off">
+      <div class="field"><label for="fWordIn">Word</label>
+        <div class="inline"><input id="fWordIn" required autocapitalize="none" autocorrect="off"><button type="button" class="btn btn-soft" id="defineBtn">Define</button></div>
+      </div>
+      <div class="status-line" id="defineStatus"></div>
+      <div class="suggest" id="suggest" hidden></div>
+      <div class="grid2">
+        <div class="field"><label for="fPosIn">Part of speech</label><input id="fPosIn" placeholder="noun, verb…"></div>
+        <div class="field"><label for="fPhonIn">Pronunciation</label><input id="fPhonIn" placeholder="/ˈwɜːd/"></div>
+      </div>
+      <div class="field"><label for="fDefIn">Definition</label><textarea id="fDefIn" rows="2" placeholder="Fills in automatically, or write your own"></textarea></div>
+      <div class="field"><label for="fCtxIn">Sentence from your Kobo</label><textarea id="fCtxIn" rows="2" class="serif" placeholder="Paste or type the line you read it in"></textarea></div>
+      <div class="grid3">
+        <div class="field"><label for="fBookIn">Book</label><input id="fBookIn" list="bookList" placeholder="e.g. Middlemarch"><datalist id="bookList"></datalist></div>
+        <div class="field"><label for="fPageIn">Page / ch.</label><input id="fPageIn" placeholder="p. 42"></div>
+      </div>
+      <div class="grid2">
+        <div class="field"><label for="fTagsIn">Tags</label><input id="fTagsIn" placeholder="fiction, philosophy"></div>
+        <div class="field"><label for="fStatusIn">Status</label><select id="fStatusIn"><option value="LEARNING">Learning</option><option value="MASTERED">Mastered</option></select></div>
+      </div>
+      <input type="hidden" id="fAudioIn">
+      <div class="status-line" id="saveStatus"></div>
+      <div class="form-actions">
+        <button type="button" class="btn btn-ghost" data-close="wordSheet">Cancel</button>
+        <button type="submit" class="btn btn-primary" id="saveBtn">Save word</button>
+      </div>
+    </form>
+  </div>
+</div>
+
+<!-- Scan sheet -->
+<div class="sheet-scrim" id="scanSheet" hidden>
+  <div class="sheet" role="dialog" aria-modal="true" aria-labelledby="scanTitle">
+    <div class="sheet-head"><h3 id="scanTitle">Scan your Kobo screen</h3><button class="iconbtn" data-close="scanSheet" aria-label="Close"><svg class="i"><use href="#i-x"/></svg></button></div>
+    <p style="margin:0;font-size:.82rem;color:var(--muted);line-height:1.5">Take a close photo of the few lines around your word. Text is read on your phone, then tap the word you meant.</p>
+    <input type="file" id="scanFile" accept="image/*" capture="environment" hidden>
+    <button class="btn btn-primary" id="pickPhoto" style="justify-content:center;padding:.8rem"><svg class="i"><use href="#i-camera"/></svg>Take or choose a photo</button>
+    <img id="scanPreview" class="scan-preview" alt="Photo of the Kobo screen" hidden>
+    <div class="status-line" id="scanStatus"></div>
+    <div class="chips" id="scanChips"></div>
+  </div>
+</div>
+
+<!-- Settings sheet -->
+<div class="sheet-scrim" id="settingsSheet" hidden>
+  <div class="sheet" role="dialog" aria-modal="true" aria-labelledby="setTitle">
+    <div class="sheet-head"><h3 id="setTitle">Settings</h3><button class="iconbtn" data-close="settingsSheet" aria-label="Close"><svg class="i"><use href="#i-x"/></svg></button></div>
+    <div class="panel"><strong>Export your library</strong><p>Download a copy of every word as JSON or CSV.</p>
+      <div class="inline"><button class="btn btn-primary" id="exportJson">Export JSON</button><button class="btn btn-ghost" id="exportCsv">Export CSV</button></div>
+    </div>
+    <div class="panel"><strong>Import a backup</strong><p>Choose a JSON file exported from any version of Marginalia. Words are added to your library.</p>
+      <input type="file" id="importFile" accept=".json,application/json" hidden>
+      <button class="btn btn-ghost" id="importBtn" style="align-self:flex-start">Choose JSON file</button>
+      <div class="status-line" id="importStatus"></div>
+    </div>
+    <div class="panel"><strong>Account</strong><p id="acctEmail"></p>
+      <button class="btn btn-ghost" id="signOutBtn" style="align-self:flex-start">Sign out</button>
+    </div>
+  </div>
+</div>
+
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.45.4/dist/umd/supabase.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/tesseract.js@5.1.1/dist/tesseract.min.js"></script>
+<script>
+(() => {
+  const SUPABASE_URL = 'https://ozboxgoeenbifneluyyy.supabase.co';
+  const SUPABASE_KEY = 'sb_publishable_cucB_06Le9FSK2HigmfQsg_KqDRdu3D';
+  const sb = supabase.createClient(SUPABASE_URL, SUPABASE_KEY, { auth: { persistSession: true, autoRefreshToken: true } });
+
+  const $ = (id) => document.getElementById(id);
+  let words = [], editId = null, sortAsc = false, queue = [], qi = 0, user = null, lastBook = '';
+
+  // ---------- helpers ----------
+  const esc = (s) => String(s ?? '').replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+  const open = (id) => { $(id).hidden = false; };
+  const close = (id) => { $(id).hidden = true; };
+  document.querySelectorAll('[data-close]').forEach(b => b.addEventListener('click', () => close(b.dataset.close)));
+  document.querySelectorAll('.sheet-scrim').forEach(s => s.addEventListener('click', e => { if (e.target === s) s.hidden = true; }));
+  const status = (el, msg, err) => { el.textContent = msg || ''; el.classList.toggle('err', !!err); };
+  const showBanner = (msg) => { const b = $('banner'); b.textContent = msg || ''; b.hidden = !msg; };
+
+  // DB row <-> app object
+  const fromRow = r => ({ id: r.id, word: r.word, partOfSpeech: r.part_of_speech, phonetic: r.phonetic, definition: r.definition,
+    context: r.context, bookTitle: r.book_title, pageNumber: r.page_number, tags: r.tags || [], status: r.status,
+    audioUrl: r.audio_url, createdAt: Date.parse(r.created_at) });
+  const toRow = w => ({ word: w.word, part_of_speech: w.partOfSpeech || '', phonetic: w.phonetic || '', definition: w.definition || '',
+    context: w.context || '', book_title: w.bookTitle || '', page_number: w.pageNumber || '', tags: w.tags || [],
+    status: w.status === 'MASTERED' ? 'MASTERED' : 'LEARNING', audio_url: w.audioUrl || '' });
+
+  // ---------- theme ----------
+  const root = document.documentElement;
+  const isDark = () => root.dataset.theme ? root.dataset.theme === 'dark' : matchMedia('(prefers-color-scheme: dark)').matches;
+  const syncIcon = () => $('themeIcon').setAttribute('href', isDark() ? '#i-sun' : '#i-moon');
+  try { const t = localStorage.getItem('marginalia_theme'); if (t === 'dark' || t === 'light') root.dataset.theme = t; } catch {}
+  syncIcon();
+  $('themeBtn').addEventListener('click', () => {
+    const next = isDark() ? 'light' : 'dark';
+    root.dataset.theme = next;
+    try { localStorage.setItem('marginalia_theme', next); } catch {}
+    syncIcon();
+  });
+
+  // ---------- auth ----------
+  let signUpMode = false;
+  function showAuth() {
+    $('authView').hidden = false; $('libraryView').hidden = true; $('reviewView').hidden = true;
+    $('tabs').hidden = true; $('openSettings').hidden = true;
+  }
+  function showApp() {
+    $('authView').hidden = true; $('libraryView').hidden = false; $('reviewView').hidden = true;
+    $('tabs').hidden = false; $('openSettings').hidden = false;
+    $('acctEmail').textContent = 'Signed in as ' + (user?.email || '');
+  }
+  $('authToggle').addEventListener('click', () => {
+    signUpMode = !signUpMode;
+    $('authTitle').textContent = signUpMode ? 'Create your library' : 'Sign in to your library';
+    $('authSubmit').textContent = signUpMode ? 'Create account' : 'Sign in';
+    $('authToggle').textContent = signUpMode ? 'Already have an account? Sign in' : 'New here? Create an account';
+    $('authPass').autocomplete = signUpMode ? 'new-password' : 'current-password';
+    status($('authStatus'));
+  });
+  $('authForm').addEventListener('submit', async (e) => {
+    e.preventDefault();
+    const email = $('authEmail').value.trim(), password = $('authPass').value;
+    $('authSubmit').disabled = true;
+    status($('authStatus'), signUpMode ? 'Creating account…' : 'Signing in…');
+    try {
+      if (signUpMode) {
+        const { data, error } = await sb.auth.signUp({ email, password, options: { emailRedirectTo: location.origin + location.pathname } });
+        if (error) throw error;
+        if (!data.session) status($('authStatus'), 'Check your email and tap the confirmation link, then come back and sign in.');
+      } else {
+        const { error } = await sb.auth.signInWithPassword({ email, password });
+        if (error) throw error;
+      }
+    } catch (err) {
+      const m = String(err.message || err);
+      status($('authStatus'), /confirm/i.test(m) ? 'Confirm your email first: tap the link we sent you, then sign in.' :
+        /invalid login/i.test(m) ? 'Wrong email or password.' : m, true);
+    } finally { $('authSubmit').disabled = false; }
+  });
+  $('signOutBtn').addEventListener('click', async () => { await sb.auth.signOut(); close('settingsSheet'); });
+
+  sb.auth.onAuthStateChange((_evt, session) => {
+    const was = user?.id;
+    user = session?.user || null;
+    if (!user) { words = []; showAuth(); return; }
+    showApp();
+    if (was !== user.id) loadWords();
+  });
+
+  // ---------- data ----------
+  async function loadWords() {
+    const { data, error } = await sb.from('words').select('*').order('created_at', { ascending: false });
+    if (error) { showBanner('Could not load your words: ' + error.message + '. Pull to refresh or reopen the app.'); $('list').innerHTML = ''; return; }
+    showBanner('');
+    words = data.map(fromRow);
+    renderLibrary();
+  }
+  document.addEventListener('visibilitychange', () => { if (!document.hidden && user) loadWords(); });
+
+  // ---------- library ----------
+  function filtered() {
+    const q = $('searchInput').value.toLowerCase().trim();
+    const book = $('bookFilter').value, st = $('statusFilter').value;
+    return words.filter(w =>
+      (!q || [w.word, w.definition, w.context].some(x => (x || '').toLowerCase().includes(q))) &&
+      (book === 'ALL' || w.bookTitle === book) &&
+      (st === 'ALL' || w.status === st)
+    ).sort((a, b) => sortAsc ? a.createdAt - b.createdAt : b.createdAt - a.createdAt);
+  }
+  function renderBooks() {
+    const books = [...new Set(words.map(w => w.bookTitle).filter(Boolean))].sort();
+    const sel = $('bookFilter'), cur = sel.value;
+    sel.innerHTML = '<option value="ALL">All Books</option>' + books.map(b => `<option value="${esc(b)}">${esc(b)}</option>`).join('');
+    sel.value = books.includes(cur) ? cur : 'ALL';
+    $('bookList').innerHTML = books.map(b => `<option value="${esc(b)}">`).join('');
+  }
+  function renderLibrary() {
+    renderBooks();
+    const list = filtered();
+    $('counter').textContent = `${list.length} word${list.length === 1 ? '' : 's'} recorded`;
+    $('empty').hidden = words.length !== 0;
+    if (!list.length) { $('list').innerHTML = words.length ? '<div class="loading">No words match these filters.</div>' : ''; return; }
+    $('list').innerHTML = list.map(w => `
+      <article class="word">
+        <div class="word-top">
+          <div style="min-width:0">
+            <div class="word-name"><h3>${esc(w.word)}</h3>${w.partOfSpeech ? `<span class="pos">${esc(w.partOfSpeech)}</span>` : ''}</div>
+            ${w.phonetic ? `<div class="phon">${esc(w.phonetic)}</div>` : ''}
+          </div>
+          <div class="actions">
+            <span class="pill ${w.status === 'MASTERED' ? 'MASTERED' : 'LEARNING'}">${w.status === 'MASTERED' ? 'Mastered' : 'Learning'}</span>
+            <button class="iconbtn" data-edit="${esc(w.id)}" aria-label="Edit ${esc(w.word)}"><svg class="i"><use href="#i-edit"/></svg></button>
+            <button class="iconbtn" data-del="${esc(w.id)}" aria-label="Delete ${esc(w.word)}"><svg class="i"><use href="#i-trash"/></svg></button>
+          </div>
+        </div>
+        <span class="confirm" data-confirm="${esc(w.id)}" hidden>Delete this word? <button class="btn btn-learning" data-yes="${esc(w.id)}">Delete</button><button class="linkbtn" data-no="${esc(w.id)}">Keep</button></span>
+        ${w.definition ? `<p class="def">${esc(w.definition)}</p>` : ''}
+        ${w.context ? `<p class="ctx">"${esc(w.context)}"</p>` : ''}
+        <div class="foot">
+          <span>${w.bookTitle ? esc(w.bookTitle) + (w.pageNumber ? ' (' + esc(w.pageNumber) + ')' : '') : 'Standalone word'}</span>
+          ${(w.tags || []).length ? `<span class="tags">${w.tags.map(t => `<span class="tag">#${esc(t)}</span>`).join('')}</span>` : ''}
+        </div>
+      </article>`).join('');
+  }
+  $('list').addEventListener('click', async (e) => {
+    const t = e.target.closest('button'); if (!t) return;
+    if (t.dataset.edit) openEdit(t.dataset.edit);
+    if (t.dataset.del) document.querySelector(`[data-confirm="${CSS.escape(t.dataset.del)}"]`).hidden = false;
+    if (t.dataset.no) document.querySelector(`[data-confirm="${CSS.escape(t.dataset.no)}"]`).hidden = true;
+    if (t.dataset.yes) {
+      t.disabled = true;
+      const { error } = await sb.from('words').delete().eq('id', t.dataset.yes);
+      if (error) { showBanner('Could not delete that word: ' + error.message); t.disabled = false; return; }
+      words = words.filter(w => w.id !== t.dataset.yes); renderLibrary();
+    }
+  });
+  ['searchInput', 'bookFilter', 'statusFilter'].forEach(id => $(id).addEventListener('input', renderLibrary));
+  $('sortBtn').addEventListener('click', () => { sortAsc = !sortAsc; $('sortBtn').textContent = 'Sort: ' + (sortAsc ? 'Oldest' : 'Newest') + ' ⇅'; renderLibrary(); });
+
+  // ---------- add / edit ----------
+  const F = { word: 'fWordIn', partOfSpeech: 'fPosIn', phonetic: 'fPhonIn', definition: 'fDefIn', context: 'fCtxIn', bookTitle: 'fBookIn', pageNumber: 'fPageIn', status: 'fStatusIn', audioUrl: 'fAudioIn' };
+  function resetSheet() { status($('defineStatus')); status($('saveStatus')); $('suggest').hidden = true; $('suggest').innerHTML = ''; }
+  function openAdd(word = '', ctx = '') {
+    editId = null; $('sheetTitle').textContent = 'Add word';
+    $('wordForm').reset(); $('fAudioIn').value = '';
+    $('fWordIn').value = word; $('fCtxIn').value = ctx; $('fBookIn').value = lastBook;
+    resetSheet(); open('wordSheet');
+    if (word) define();
+  }
+  function openEdit(id) {
+    const w = words.find(x => x.id === id); if (!w) return;
+    editId = id; $('sheetTitle').textContent = 'Edit word';
+    for (const [k, el] of Object.entries(F)) $(el).value = w[k] || (k === 'status' ? 'LEARNING' : '');
+    $('fTagsIn').value = (w.tags || []).join(', ');
+    resetSheet(); open('wordSheet');
+  }
+  $('quickForm').addEventListener('submit', (e) => { e.preventDefault(); const w = $('quickInput').value.trim(); if (w) openAdd(w); });
+
+  let lookupSeq = 0;
+  async function define() {
+    const word = $('fWordIn').value.trim(); if (!word) return;
+    const seq = ++lookupSeq;
+    $('suggest').hidden = true;
+    status($('defineStatus'), 'Looking up "' + word + '"…');
+    $('defineBtn').disabled = true;
+    try {
+      const { data, error } = await sb.functions.invoke('define', { body: { word } });
+      if (seq !== lookupSeq) return;
+      let body = data;
+      if (error) { try { body = await error.context.json(); } catch { body = null; } }
+      if (body && body.definition) {
+        if (body.word && body.word.toLowerCase() !== word.toLowerCase()) $('fWordIn').value = body.word;
+        $('fPosIn').value = body.partOfSpeech || ''; $('fPhonIn').value = body.phonetic || '';
+        $('fDefIn').value = body.definition; $('fAudioIn').value = body.audioUrl || '';
+        status($('defineStatus'), 'From ' + (body.source || 'the dictionary') + '. Edit anything before saving.');
+      } else if (body && body.suggestions && body.suggestions.length) {
+        status($('defineStatus'), 'Not found. Did you mean:', true);
+        $('suggest').innerHTML = body.suggestions.map(s => `<button type="button" data-s="${esc(s)}">${esc(s)}</button>`).join('');
+        $('suggest').hidden = false;
+      } else status($('defineStatus'), 'No definition found. Write your own, or check the spelling.', true);
+    } catch {
+      if (seq === lookupSeq) status($('defineStatus'), 'Lookup failed. Check your connection and tap Define again.', true);
+    } finally { if (seq === lookupSeq) $('defineBtn').disabled = false; }
+  }
+  $('defineBtn').addEventListener('click', define);
+  $('suggest').addEventListener('click', (e) => { const b = e.target.closest('[data-s]'); if (b) { $('fWordIn').value = b.dataset.s; define(); } });
+
+  $('wordForm').addEventListener('submit', async (e) => {
+    e.preventDefault();
+    const w = {
+      word: $('fWordIn').value.trim().toLowerCase(), partOfSpeech: $('fPosIn').value.trim(), phonetic: $('fPhonIn').value.trim(),
+      definition: $('fDefIn').value.trim(), context: $('fCtxIn').value.trim(), bookTitle: $('fBookIn').value.trim(),
+      pageNumber: $('fPageIn').value.trim(), tags: $('fTagsIn').value.split(',').map(t => t.trim()).filter(Boolean),
+      status: $('fStatusIn').value, audioUrl: $('fAudioIn').value
+    };
+    if (!w.word) return;
+    $('saveBtn').disabled = true; status($('saveStatus'), 'Saving…');
+    const q = editId ? sb.from('words').update(toRow(w)).eq('id', editId).select().single()
+                     : sb.from('words').insert(toRow(w)).select().single();
+    const { data, error } = await q;
+    $('saveBtn').disabled = false;
+    if (error) { status($('saveStatus'), 'Could not save: ' + error.message + '. Tap Save again.', true); return; }
+    const saved = fromRow(data);
+    words = editId ? words.map(x => x.id === editId ? saved : x) : [saved, ...words];
+    lastBook = w.bookTitle;
+    close('wordSheet'); $('quickInput').value = ''; renderLibrary();
+  });
+
+  $('seedBtn').addEventListener('click', async () => {
+    $('seedBtn').disabled = true;
+    const ex = [
+      { word: 'palimpsest', partOfSpeech: 'noun', phonetic: '/ˈpæl.ɪmp.sest/', definition: 'Something reused or altered that still shows traces of its earlier form.', context: 'The parchment was a palimpsest, showing faint traces of Latin underneath the medieval French.', bookTitle: 'Example: The Name of the Rose', pageNumber: 'p. 114', tags: ['example'], status: 'LEARNING' },
+      { word: 'sublime', partOfSpeech: 'adjective', phonetic: '/səˈblaɪm/', definition: 'So grand or beautiful that it inspires awe.', context: 'The mountains at dawn were sublime.', bookTitle: 'Example: Frankenstein', pageNumber: 'p. 88', tags: ['example'], status: 'MASTERED' }
+    ];
+    const { error } = await sb.from('words').insert(ex.map(toRow));
+    $('seedBtn').disabled = false;
+    if (error) showBanner('Could not add the examples: ' + error.message); else loadWords();
+  });
+
+  // ---------- scan (on-device OCR) ----------
+  const STOP = new Set('the and that with this from have were they their there which would could should about into than then them these those what when where while your yours been being because before after again other only over such very just more most some much many also even said each every here upon shall must might under until through without within'.split(' '));
+  $('scanBtn').addEventListener('click', () => { $('scanPreview').hidden = true; $('scanChips').innerHTML = ''; status($('scanStatus')); open('scanSheet'); });
+  $('pickPhoto').addEventListener('click', () => $('scanFile').click());
+  $('scanFile').addEventListener('change', async (e) => {
+    const file = e.target.files[0]; e.target.value = ''; if (!file) return;
+    const prev = $('scanPreview'); prev.src = URL.createObjectURL(file); prev.hidden = false;
+    $('scanChips').innerHTML = ''; $('pickPhoto').disabled = true;
+    status($('scanStatus'), 'Reading the text… (first scan downloads the reader, about 10 seconds)');
+    try {
+      const { data: { text } } = await Tesseract.recognize(file, 'eng');
+      const lines = text.replace(/-\n/g, '').replace(/\s+/g, ' ');
+      const seen = new Set(), cands = [];
+      for (const m of lines.matchAll(/[A-Za-z][A-Za-z'’-]{3,}/g)) {
+        const w = m[0].replace(/[’']s$/, '').toLowerCase();
+        if (w.length < 4 || STOP.has(w) || seen.has(w)) continue;
+        seen.add(w); cands.push(w);
+      }
+      if (!cands.length) { status($('scanStatus'), 'No text found. Get closer, avoid glare, and try again.', true); return; }
+      cands.sort((a, b) => b.length - a.length);
+      status($('scanStatus'), 'Tap the word you meant:');
+      $('scanChips').innerHTML = cands.slice(0, 18).map(w => `<button class="chip" data-w="${esc(w)}">${esc(w)}</button>`).join('');
+      $('scanChips').dataset.text = lines;
+    } catch { status($('scanStatus'), 'Could not read the photo. Try again or type the word.', true); }
+    finally { $('pickPhoto').disabled = false; }
+  });
+  $('scanChips').addEventListener('click', (e) => {
+    const b = e.target.closest('[data-w]'); if (!b) return;
+    const text = $('scanChips').dataset.text || '', w = b.dataset.w;
+    const sentence = (text.split(/(?<=[.!?…])\s+/).find(s => s.toLowerCase().includes(w)) || '').trim();
+    close('scanSheet'); openAdd(w, sentence);
+  });
+
+  // ---------- flashcards ----------
+  function startReview() {
+    const learning = words.filter(w => w.status !== 'MASTERED');
+    queue = (learning.length ? learning : words.slice()).map(w => w.id);
+    for (let i = queue.length - 1; i > 0; i--) { const j = Math.floor(Math.random() * (i + 1)); [queue[i], queue[j]] = [queue[j], queue[i]]; }
+    $('reviewLabel').textContent = learning.length ? 'Learning words' : 'Everything is mastered, reviewing all';
+    qi = 0; renderCard();
+  }
+  function renderCard() {
+    $('card').classList.remove('flipped');
+    const w = words.find(x => x.id === queue[qi]);
+    $('learningBtn').disabled = $('masteredBtn').disabled = !w;
+    if (!w) {
+      $('fWord').textContent = words.length ? 'Done for now' : 'No cards yet';
+      $('fPhon').textContent = ''; $('fBook').textContent = ''; $('fStatus').textContent = ''; $('fStatus').className = 'pill';
+      $('reviewCount').textContent = '0 / 0'; $('bar').style.width = '0%'; return;
+    }
+    $('reviewCount').textContent = `${qi + 1} / ${queue.length}`;
+    $('bar').style.width = ((qi + 1) / queue.length * 100) + '%';
+    $('fWord').textContent = w.word; $('fPhon').textContent = w.phonetic || ''; $('fBook').textContent = w.bookTitle || '';
+    $('fStatus').textContent = w.status === 'MASTERED' ? 'Mastered' : 'Learning';
+    $('fStatus').className = 'pill ' + (w.status === 'MASTERED' ? 'MASTERED' : 'LEARNING');
+    $('bWord').textContent = w.word; $('bPos').textContent = w.partOfSpeech || ''; $('bPos').hidden = !w.partOfSpeech;
+    $('bDef').textContent = w.definition || 'No definition saved.';
+    $('bCtxWrap').hidden = !w.context; $('bCtx').textContent = w.context ? '"' + w.context + '"' : '';
+  }
+  async function mark(st) {
+    const id = queue[qi]; if (!id) return;
+    const w = words.find(x => x.id === id);
+    if (w && w.status !== st) {
+      const { error } = await sb.from('words').update({ status: st }).eq('id', id);
+      if (error) showBanner('Could not update that card: ' + error.message); else w.status = st;
+    }
+    qi++;
+    if (qi >= queue.length) { queue = []; renderCard(); $('reviewLabel').textContent = 'Round finished. Tap Flashcards to go again.'; }
+    else renderCard();
+  }
+  const flip = () => $('card').classList.toggle('flipped');
+  $('card').addEventListener('click', (e) => { if (!e.target.closest('button')) flip(); });
+  $('card').addEventListener('keydown', (e) => { if (e.key === ' ' || e.key === 'Enter') { e.preventDefault(); flip(); } });
+  $('learningBtn').addEventListener('click', () => mark('LEARNING'));
+  $('masteredBtn').addEventListener('click', () => mark('MASTERED'));
+  $('speakBtn').addEventListener('click', (e) => {
+    e.stopPropagation();
+    const w = words.find(x => x.id === queue[qi]); if (!w) return;
+    const say = () => { if ('speechSynthesis' in window) { const u = new SpeechSynthesisUtterance(w.word); u.lang = 'en-US'; speechSynthesis.cancel(); speechSynthesis.speak(u); } };
+    if (w.audioUrl) new Audio(w.audioUrl).play().catch(say); else say();
+  });
+
+  // ---------- tabs ----------
+  function tab(which) {
+    const lib = which === 'library';
+    $('libraryView').hidden = !lib; $('reviewView').hidden = lib;
+    if (lib) { $('tabLibrary').setAttribute('aria-current', 'page'); $('tabReview').removeAttribute('aria-current'); renderLibrary(); }
+    else { $('tabReview').setAttribute('aria-current', 'page'); $('tabLibrary').removeAttribute('aria-current'); startReview(); }
+  }
+  $('tabLibrary').addEventListener('click', () => tab('library'));
+  $('tabReview').addEventListener('click', () => tab('review'));
+
+  // ---------- backup ----------
+  $('openSettings').addEventListener('click', () => { status($('importStatus')); open('settingsSheet'); });
+  const stamp = () => new Date().toISOString().slice(0, 10);
+  function download(name, text, type) {
+    const a = document.createElement('a');
+    a.href = URL.createObjectURL(new Blob([text], { type }));
+    a.download = name; document.body.appendChild(a); a.click(); a.remove();
+    setTimeout(() => URL.revokeObjectURL(a.href), 2000);
+  }
+  $('exportJson').addEventListener('click', () => download(`marginalia_${stamp()}.json`, JSON.stringify(words, null, 2), 'application/json'));
+  $('exportCsv').addEventListener('click', () => {
+    const cols = ['word', 'partOfSpeech', 'phonetic', 'definition', 'context', 'bookTitle', 'pageNumber', 'status', 'tags'];
+    const q = v => '"' + String(Array.isArray(v) ? v.join(';') : (v ?? '')).replace(/"/g, '""') + '"';
+    download(`marginalia_${stamp()}.csv`, [cols.join(','), ...words.map(w => cols.map(c => q(w[c])).join(','))].join('\n'), 'text/csv');
+  });
+  $('importBtn').addEventListener('click', () => $('importFile').click());
+  $('importFile').addEventListener('change', async (e) => {
+    const file = e.target.files[0]; e.target.value = ''; if (!file) return;
+    let arr;
+    try { arr = JSON.parse(await file.text()); } catch { status($('importStatus'), "That file isn't valid JSON.", true); return; }
+    if (!Array.isArray(arr)) { status($('importStatus'), 'Expected a list of words in that file.', true); return; }
+    const have = new Set(words.map(w => w.word + '|' + (w.bookTitle || '')));
+    const rows = arr.filter(w => w && w.word && !have.has(String(w.word).toLowerCase() + '|' + (w.bookTitle || '')))
+      .map(w => toRow({ ...w, word: String(w.word).toLowerCase() }));
+    if (!rows.length) { status($('importStatus'), 'Nothing new to import.'); return; }
+    status($('importStatus'), `Importing ${rows.length}…`);
+    const { error } = await sb.from('words').insert(rows);
+    if (error) { status($('importStatus'), 'Import failed: ' + error.message, true); return; }
+    status($('importStatus'), `Imported ${rows.length} word${rows.length === 1 ? '' : 's'}.`);
+    loadWords();
+  });
+})();
+</script>
+</body>
+</html>
