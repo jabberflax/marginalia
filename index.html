@@ -356,6 +356,27 @@ nav.tabs button[aria-current="page"] { color: var(--accent) }
   </div>
 </div>
 
+<script>
+/* Self-update: compare this page's version with version.json (never cached) and reload once if newer. */
+(() => {
+  const APP_VERSION = '3';
+  async function check() {
+    try {
+      const r = await fetch('version.json?t=' + Date.now(), { cache: 'no-store' });
+      if (!r.ok) return;
+      const { v } = await r.json();
+      if (!v || v === APP_VERSION) return;
+      const key = 'marginalia_reloaded_for';
+      let done = null; try { done = sessionStorage.getItem(key); } catch {}
+      if (done === v) return;
+      try { sessionStorage.setItem(key, v); } catch {}
+      location.replace(location.pathname + '?v=' + encodeURIComponent(v));
+    } catch {}
+  }
+  check();
+  document.addEventListener('visibilitychange', () => { if (!document.hidden) check(); });
+})();
+</script>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.45.4/dist/umd/supabase.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/tesseract.js@5.1.1/dist/tesseract.min.js"></script>
 <script>
