@@ -101,8 +101,8 @@ main { padding-block: 1rem 1.5rem; padding-left: max(16px, env(safe-area-inset-l
 .pill { font-size: .6rem; font-weight: 700; letter-spacing: .08em; text-transform: uppercase; border-radius: 999px; padding: .15rem .5rem }
 .pill.LEARNING { background: var(--warn-soft); color: var(--warn) }
 .pill.MASTERED { background: var(--good-soft); color: var(--good) }
-.def { margin: 0; font-size: .85rem; line-height: 1.5 }
-.ctx { margin: 0; font-family: var(--quote); font-style: normal; font-size: .85rem; line-height: 1.5; color: var(--muted); background: var(--surface); border-left: 2px solid var(--accent); border-radius: 0 .5rem .5rem 0; padding: .3rem .6rem .3rem .7rem }
+.def { margin: 0; font-size: .85rem; line-height: 1.5; white-space: pre-line }
+.ctx { margin: 0; white-space: pre-line; font-family: var(--quote); font-style: normal; font-size: .85rem; line-height: 1.5; color: var(--muted); background: var(--surface); border-left: 2px solid var(--accent); border-radius: 0 .5rem .5rem 0; padding: .3rem .6rem .3rem .7rem }
 .foot { display: flex; justify-content: space-between; align-items: center; gap: .5rem; flex-wrap: wrap; border-top: 1px solid var(--line); padding-top: .45rem; font-size: .68rem; font-weight: 500; color: var(--muted) }
 .tags { display: flex; gap: .25rem; flex-wrap: wrap }
 .tag { background: var(--bg); border-radius: .3rem; padding: .05rem .35rem }
@@ -305,7 +305,7 @@ nav.tabs button[aria-current="page"] { color: var(--accent) }
         <div class="field"><label for="fPosIn">Part of speech</label><input id="fPosIn" placeholder="noun, verb…"></div>
         <div class="field"><label for="fPhonIn">Pronunciation</label><input id="fPhonIn" placeholder="/ˈwɜːd/"></div>
       </div>
-      <div class="field"><label for="fDefIn">Definition</label><textarea id="fDefIn" rows="2" placeholder="Fills in automatically, or write your own"></textarea></div>
+      <div class="field"><label for="fDefIn">Definition</label><textarea id="fDefIn" rows="4" placeholder="Fills in automatically, or write your own"></textarea></div>
       <div class="field"><label for="fCtxIn">Sentence from your Kobo</label><textarea id="fCtxIn" rows="2" class="serif" placeholder="Paste or type the line you read it in"></textarea></div>
       <div class="grid3">
         <div class="field"><label for="fBookIn">Book</label><input id="fBookIn" list="bookList" placeholder="e.g. Middlemarch"><datalist id="bookList"></datalist></div>
@@ -359,7 +359,7 @@ nav.tabs button[aria-current="page"] { color: var(--accent) }
 <script>
 /* Self-update: compare this page's version with version.json (never cached) and reload once if newer. */
 (() => {
-  const APP_VERSION = '3';
+  const APP_VERSION = '4';
   async function check() {
     try {
       const r = await fetch('version.json?t=' + Date.now(), { cache: 'no-store' });
