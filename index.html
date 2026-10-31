@@ -359,7 +359,7 @@ nav.tabs button[aria-current="page"] { color: var(--accent) }
 <script>
 /* Self-update: compare this page's version with version.json (never cached) and reload once if newer. */
 (() => {
-  const APP_VERSION = '4';
+  const APP_VERSION = '5';
   async function check() {
     try {
       const r = await fetch('version.json?t=' + Date.now(), { cache: 'no-store' });
@@ -564,7 +564,7 @@ nav.tabs button[aria-current="page"] { color: var(--accent) }
     status($('defineStatus'), 'Looking up "' + word + '"…');
     $('defineBtn').disabled = true;
     try {
-      const { data, error } = await sb.functions.invoke('define', { body: { word } });
+      const { data, error } = await sb.functions.invoke('define', { body: { word, context: $('fCtxIn').value.trim(), book: $('fBookIn').value.trim() } });
       if (seq !== lookupSeq) return;
       let body = data;
       if (error) { try { body = await error.context.json(); } catch { body = null; } }
