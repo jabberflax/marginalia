@@ -93,6 +93,9 @@ main { padding-block: 1rem 1.5rem; padding-left: max(16px, env(safe-area-inset-l
 .word-top { display: flex; justify-content: space-between; align-items: flex-start; gap: .5rem }
 .word-name { display: flex; flex-wrap: wrap; align-items: baseline; gap: .4rem; min-width: 0 }
 .word h3 { margin: 0; font-family: var(--serif); font-weight: 700; font-size: 1.25rem; color: var(--accent); overflow-wrap: anywhere; text-transform: capitalize }
+.saybtn { border: 0; background: transparent; color: var(--muted); padding: .2rem; border-radius: 999px; display: inline-flex; align-self: center }
+.saybtn:hover { color: var(--accent); background: var(--accent-soft) }
+.saybtn svg.i { width: .95rem; height: .95rem }
 .pos { font-size: .68rem; font-style: italic; color: var(--muted); background: var(--bg); border-radius: .35rem; padding: .1rem .4rem }
 .phon { font-family: var(--mono); font-size: .72rem; color: var(--muted) }
 .actions { display: flex; align-items: center; gap: .1rem; flex-shrink: 0 }
@@ -359,7 +362,7 @@ nav.tabs button[aria-current="page"] { color: var(--accent) }
 <script>
 /* Self-update: compare this page's version with version.json (never cached) and reload once if newer. */
 (() => {
-  const APP_VERSION = '5';
+  const APP_VERSION = '6';
   async function check() {
     try {
       const r = await fetch('version.json?t=' + Date.now(), { cache: 'no-store' });
@@ -504,7 +507,7 @@ nav.tabs button[aria-current="page"] { color: var(--accent) }
       <article class="word">
         <div class="word-top">
           <div style="min-width:0">
-            <div class="word-name"><h3>${esc(w.word)}</h3>${w.partOfSpeech ? `<span class="pos">${esc(w.partOfSpeech)}</span>` : ''}</div>
+            <div class="word-name"><h3>${esc(w.word)}</h3>${w.partOfSpeech ? `<span class="pos">${esc(w.partOfSpeech)}</span>` : ''}<button class="saybtn" data-say="${esc(w.id)}" aria-label="Pronounce ${esc(w.word)}"><svg class="i"><use href="#i-speaker"/></svg></button></div>
             ${w.phonetic ? `<div class="phon">${esc(w.phonetic)}</div>` : ''}
           </div>
           <div class="actions">
@@ -524,6 +527,7 @@ nav.tabs button[aria-current="page"] { color: var(--accent) }
   }
   $('list').addEventListener('click', async (e) => {
     const t = e.target.closest('button'); if (!t) return;
+    if (t.dataset.say) { speak(words.find(w => w.id === t.dataset.say)); return; }
     if (t.dataset.edit) openEdit(t.dataset.edit);
     if (t.dataset.del) document.querySelector(`[data-confirm="${CSS.escape(t.dataset.del)}"]`).hidden = false;
     if (t.dataset.no) document.querySelector(`[data-confirm="${CSS.escape(t.dataset.no)}"]`).hidden = true;
@@ -694,10 +698,13 @@ nav.tabs button[aria-current="page"] { color: var(--accent) }
   $('masteredBtn').addEventListener('click', () => mark('MASTERED'));
   $('speakBtn').addEventListener('click', (e) => {
     e.stopPropagation();
-    const w = words.find(x => x.id === queue[qi]); if (!w) return;
+    speak(words.find(x => x.id === queue[qi]));
+  });
+  function speak(w) {
+    if (!w) return;
     const say = () => { if ('speechSynthesis' in window) { const u = new SpeechSynthesisUtterance(w.word); u.lang = 'en-US'; speechSynthesis.cancel(); speechSynthesis.speak(u); } };
     if (w.audioUrl) new Audio(w.audioUrl).play().catch(say); else say();
-  });
+  }
 
   // ---------- tabs ----------
   function tab(which) {
