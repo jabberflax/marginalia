@@ -93,6 +93,21 @@ main { padding-block: 1rem 1.5rem; padding-left: max(16px, env(safe-area-inset-l
 .word-top { display: flex; justify-content: space-between; align-items: flex-start; gap: .5rem }
 .word-name { display: flex; flex-wrap: wrap; align-items: baseline; gap: .4rem; min-width: 0 }
 .word h3 { margin: 0; font-family: var(--serif); font-weight: 700; font-size: 1.25rem; color: var(--accent); overflow-wrap: anywhere; text-transform: capitalize }
+.kobo-sum { display: flex; justify-content: space-between; align-items: flex-start; gap: .75rem }
+.kobo-sum strong { font-family: var(--serif); font-size: 1.05rem }
+#koboAll { white-space: nowrap }
+.kobo-sub { font-size: .72rem; color: var(--muted); font-weight: 400 }
+.kobo-list { display: flex; flex-direction: column; border: 1px solid var(--line); border-radius: .8rem; background: var(--card); max-height: 50vh; overflow-y: auto }
+.krow { display: flex; gap: .65rem; align-items: flex-start; padding: .55rem .75rem; border-top: 1px solid var(--line); cursor: pointer }
+.krow:first-child { border-top: 0 }
+.krow input { margin-top: .2rem; accent-color: var(--accent); width: 1rem; height: 1rem; flex-shrink: 0 }
+.krow .kw { display: flex; flex-direction: column; gap: .1rem; min-width: 0 }
+.krow .kword { font-family: var(--serif); font-weight: 700; font-size: .95rem; color: var(--accent) }
+.krow .kraw { font-size: .7rem; color: var(--muted); text-decoration: line-through; margin-left: .35rem; font-family: var(--sans); font-weight: 400 }
+.krow .kmeta { font-size: .7rem; color: var(--muted); overflow-wrap: anywhere }
+.krow.off .kword { color: var(--muted) }
+.kobo-opt { display: flex; align-items: center; gap: .5rem; font-size: .8rem; flex-wrap: wrap }
+.kobo-opt input { accent-color: var(--accent) }
 .saybtn { border: 0; background: transparent; color: var(--muted); padding: .2rem; border-radius: 999px; display: inline-flex; align-self: center }
 .saybtn:hover { color: var(--accent); background: var(--accent-soft) }
 .saybtn svg.i { width: .95rem; height: .95rem }
@@ -345,6 +360,11 @@ nav.tabs button[aria-current="page"] { color: var(--accent) }
 <div class="sheet-scrim" id="settingsSheet" hidden>
   <div class="sheet" role="dialog" aria-modal="true" aria-labelledby="setTitle">
     <div class="sheet-head"><h3 id="setTitle">Settings</h3><button class="iconbtn" data-close="settingsSheet" aria-label="Close"><svg class="i"><use href="#i-x"/></svg></button></div>
+    <div class="panel"><strong>Import from Kobo</strong><p>On a computer, connect your Kobo and choose <b>KoboReader.sqlite</b> from its hidden <b>.kobo</b> folder. Your My Words list is added here; the file stays on your computer.</p>
+      <input type="file" id="koboFile" hidden>
+      <button class="btn btn-primary" id="koboBtn" style="align-self:flex-start">Choose Kobo file</button>
+      <div class="status-line" id="koboStatus"></div>
+    </div>
     <div class="panel"><strong>Export your library</strong><p>Download a copy of every word as JSON or CSV.</p>
       <div class="inline"><button class="btn btn-primary" id="exportJson">Export JSON</button><button class="btn btn-ghost" id="exportCsv">Export CSV</button></div>
     </div>
@@ -359,10 +379,28 @@ nav.tabs button[aria-current="page"] { color: var(--accent) }
   </div>
 </div>
 
+<!-- Kobo import review sheet -->
+<div class="sheet-scrim" id="koboSheet" hidden>
+  <div class="sheet" role="dialog" aria-modal="true" aria-labelledby="koboTitle">
+    <div class="sheet-head"><h3 id="koboTitle">Import from Kobo</h3><button class="iconbtn" id="koboClose" aria-label="Close"><svg class="i"><use href="#i-x"/></svg></button></div>
+    <div class="kobo-sum">
+      <div><strong id="koboCount">0 new words</strong><div class="kobo-sub" id="koboSub"></div></div>
+      <button class="linkbtn" id="koboAll">Select none</button>
+    </div>
+    <div class="kobo-list" id="koboList"></div>
+    <label class="kobo-opt"><input type="checkbox" id="koboBase" checked> Save words in their dictionary form <span class="kobo-sub">(knaves → knave)</span></label>
+    <div class="status-line" id="koboProgress"></div>
+    <div class="form-actions">
+      <button type="button" class="btn btn-ghost" id="koboCancel">Cancel</button>
+      <button type="button" class="btn btn-primary" id="koboImport">Import 0 words</button>
+    </div>
+  </div>
+</div>
+
 <script>
 /* Self-update: compare this page's version with version.json (never cached) and reload once if newer. */
 (() => {
-  const APP_VERSION = '6';
+  const APP_VERSION = '7';
   async function check() {
     try {
       const r = await fetch('version.json?t=' + Date.now(), { cache: 'no-store' });
@@ -403,7 +441,7 @@ nav.tabs button[aria-current="page"] { color: var(--accent) }
   // DB row <-> app object
   const fromRow = r => ({ id: r.id, word: r.word, partOfSpeech: r.part_of_speech, phonetic: r.phonetic, definition: r.definition,
     context: r.context, bookTitle: r.book_title, pageNumber: r.page_number, tags: r.tags || [], status: r.status,
-    audioUrl: r.audio_url, createdAt: Date.parse(r.created_at) });
+    audioUrl: r.audio_url, createdAt: Date.parse(r.created_at), source: r.source || 'manual', koboKey: r.kobo_key || null });
   const toRow = w => ({ word: w.word, part_of_speech: w.partOfSpeech || '', phonetic: w.phonetic || '', definition: w.definition || '',
     context: w.context || '', book_title: w.bookTitle || '', page_number: w.pageNumber || '', tags: w.tags || [],
     status: w.status === 'MASTERED' ? 'MASTERED' : 'LEARNING', audio_url: w.audioUrl || '' });
@@ -745,6 +783,167 @@ nav.tabs button[aria-current="page"] { color: var(--accent) }
     const { error } = await sb.from('words').insert(rows);
     if (error) { status($('importStatus'), 'Import failed: ' + error.message, true); return; }
     status($('importStatus'), `Imported ${rows.length} word${rows.length === 1 ? '' : 's'}.`);
+    loadWords();
+  });
+
+  // ---------- Kobo import ----------
+  // Reads KoboReader.sqlite in the browser (sql.js), lists My Words not yet in the library,
+  // matches each to a same-book highlight for its chapter, then defines in batches and saves.
+  const SQLJS = 'https://cdn.jsdelivr.net/npm/sql.js@1.12.0/dist/';
+  let sqlPromise = null;
+  function loadSqlJs() {
+    if (!sqlPromise) sqlPromise = new Promise((resolve, reject) => {
+      const s = document.createElement('script');
+      s.src = SQLJS + 'sql-wasm.js';
+      s.onload = () => initSqlJs({ locateFile: f => SQLJS + f }).then(resolve, reject);
+      s.onerror = () => { sqlPromise = null; reject(new Error('load')); };
+      document.head.appendChild(s);
+    });
+    return sqlPromise;
+  }
+  const cleanWord = s => String(s || '').normalize('NFC').replace(/^[^\p{L}]+|[^\p{L}]+$/gu, '').toLowerCase();
+  const reEsc = s => s.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+  function chapterLabel(t) {
+    t = String(t || '').trim();
+    if (!t || /\.x?html?$|^(part|index_split|chapter)?[_-]?\d+$/i.test(t) || /\.x?html?#/i.test(t)) return '';
+    return /^\d+\s*[:.]/.test(t) ? 'Ch. ' + t : t;
+  }
+  function bookFromVolume(id) {
+    try { const f = decodeURIComponent(String(id).split('/').pop() || ''); return f.replace(/\.(kepub\.)?epub$|\.pdf$/i, '').trim(); } catch { return ''; }
+  }
+  function rowsOf(db, sql) {
+    const res = db.exec(sql); if (!res.length) return [];
+    const { columns, values } = res[0];
+    return values.map(v => Object.fromEntries(columns.map((c, i) => [c, v[i]])));
+  }
+  function parseKobo(db) {
+    const raw = rowsOf(db, `SELECT w.Text AS text, w.VolumeId AS vol, w.DateCreated AS date,
+        (SELECT c.Title FROM content c WHERE c.ContentID = w.VolumeId ORDER BY (c.ContentType = 6) DESC LIMIT 1) AS title
+      FROM WordList w`);
+    let hls = [];
+    try {
+      hls = rowsOf(db, `SELECT b.VolumeID AS vol, b.Text AS text, b.DateCreated AS date,
+          (SELECT c.Title FROM content c WHERE c.ContentID = b.ContentID LIMIT 1) AS chapter
+        FROM Bookmark b WHERE b.Text IS NOT NULL AND (b.Hidden IS NULL OR LOWER(CAST(b.Hidden AS TEXT)) IN ('0', 'false'))`);
+    } catch {}
+    const byWord = new Map();
+    for (const r of raw) {
+      const w = cleanWord(r.text); if (!w) continue;
+      const prev = byWord.get(w);
+      if (!prev || String(r.date) < String(prev.date)) byWord.set(w, { ...r, word: w });
+    }
+    return [...byWord.values()].map(r => {
+      const re = new RegExp('(^|[^\\p{L}])' + reEsc(r.word) + '($|[^\\p{L}])', 'iu');
+      const t = Date.parse(r.date) || 0;
+      const hits = hls.filter(h => h.vol === r.vol && re.test(String(h.text).toLowerCase()))
+        .sort((a, b) => Math.abs((Date.parse(a.date) || 0) - t) - Math.abs((Date.parse(b.date) || 0) - t));
+      return {
+        word: r.word, raw: String(r.text).trim(), vol: r.vol,
+        book: (r.title || bookFromVolume(r.vol) || 'Unknown book').trim(),
+        chapter: hits.length ? chapterLabel(hits[0].chapter) : '',
+        date: r.date, key: r.word + '|' + r.vol, on: true
+      };
+    }).sort((a, b) => String(b.date).localeCompare(String(a.date)));
+  }
+
+  let koboItems = [], koboBusy = false, koboDone = false;
+  const fmtDate = d => { const t = Date.parse(d); return t ? new Date(t).toLocaleDateString(undefined, { day: 'numeric', month: 'short' }) : ''; };
+  function renderKobo() {
+    const n = koboItems.filter(i => i.on).length;
+    $('koboCount').textContent = `${koboItems.length} new word${koboItems.length === 1 ? '' : 's'}`;
+    $('koboAll').textContent = n === koboItems.length ? 'Select none' : 'Select all';
+    $('koboAll').hidden = !koboItems.length || koboBusy || koboDone;
+    $('koboImport').textContent = koboDone ? 'Done' : `Import ${n} word${n === 1 ? '' : 's'}`;
+    $('koboImport').disabled = koboBusy || (!koboDone && !n);
+    $('koboList').innerHTML = koboItems.map((it, i) => `
+      <label class="krow${it.on ? '' : ' off'}">
+        <input type="checkbox" data-k="${i}" ${it.on ? 'checked' : ''} ${koboBusy || koboDone ? 'disabled' : ''}>
+        <span class="kw">
+          <span class="kword">${esc(it.word)}${it.raw.toLowerCase() !== it.word ? `<span class="kraw">${esc(it.raw)}</span>` : ''}</span>
+          <span class="kmeta">${esc(it.book)}${it.chapter ? ' · ' + esc(it.chapter) : ''}${it.date ? ' · ' + esc(fmtDate(it.date)) : ''}</span>
+        </span>
+      </label>`).join('') || '<div class="loading">Nothing new to import.</div>';
+  }
+  $('koboList').addEventListener('change', e => {
+    const i = e.target.dataset.k; if (i == null) return;
+    koboItems[i].on = e.target.checked; renderKobo();
+  });
+  $('koboAll').addEventListener('click', () => {
+    const all = koboItems.every(i => i.on); koboItems.forEach(i => i.on = !all); renderKobo();
+  });
+  const closeKobo = () => { if (koboBusy) return; close('koboSheet'); if (koboDone) loadWords(); };
+  $('koboClose').addEventListener('click', closeKobo);
+  $('koboCancel').addEventListener('click', closeKobo);
+  $('koboSheet').addEventListener('click', e => { if (e.target === $('koboSheet')) { e.stopImmediatePropagation(); closeKobo(); } }, true);
+
+  $('koboBtn').addEventListener('click', () => $('koboFile').click());
+  $('koboFile').addEventListener('change', async (e) => {
+    const file = e.target.files[0]; e.target.value = ''; if (!file) return;
+    status($('koboStatus'), 'Reading your Kobo file…'); $('koboBtn').disabled = true;
+    try {
+      const head = new Uint8Array(await file.slice(0, 16).arrayBuffer());
+      if (new TextDecoder().decode(head).indexOf('SQLite format 3') !== 0) {
+        status($('koboStatus'), "That isn't a Kobo database. Choose KoboReader.sqlite from the Kobo's .kobo folder.", true); return;
+      }
+      let SQL;
+      try { SQL = await loadSqlJs(); } catch { status($('koboStatus'), "Couldn't load the Kobo reader. Check your connection and try again.", true); return; }
+      const db = new SQL.Database(new Uint8Array(await file.arrayBuffer()));
+      let all;
+      try { all = parseKobo(db); } catch { status($('koboStatus'), "This file has no My Words list. Choose KoboReader.sqlite from the Kobo's .kobo folder.", true); db.close(); return; }
+      db.close();
+      const haveWords = new Set(words.map(w => (w.word || '').toLowerCase()));
+      const haveKeys = new Set(words.map(w => w.koboKey).filter(Boolean));
+      koboItems = all.filter(i => !haveWords.has(i.word) && !haveKeys.has(i.key));
+      const skipped = all.length - koboItems.length;
+      koboDone = false; koboBusy = false;
+      $('koboSub').textContent = `From ${all.length} word${all.length === 1 ? '' : 's'} in My Words` + (skipped ? ` · ${skipped} already in your library, hidden` : '');
+      status($('koboProgress')); status($('koboStatus'));
+      renderKobo();
+      close('settingsSheet'); open('koboSheet');
+    } catch {
+      status($('koboStatus'), "Couldn't read that file. Make sure it's KoboReader.sqlite and try again.", true);
+    } finally { $('koboBtn').disabled = false; }
+  });
+
+  $('koboImport').addEventListener('click', async () => {
+    if (koboDone) { closeKobo(); return; }
+    const chosen = koboItems.filter(i => i.on); if (!chosen.length) return;
+    const useBase = $('koboBase').checked;
+    koboBusy = true; renderKobo();
+    const taken = new Set(words.map(w => (w.word || '').toLowerCase()));
+    let saved = 0, undefinedN = 0, dupes = 0, failed = 0;
+    for (let i = 0; i < chosen.length; i += 10) {
+      const batch = chosen.slice(i, i + 10);
+      status($('koboProgress'), `Defining and saving… ${Math.min(i + batch.length, chosen.length)} of ${chosen.length}`);
+      let results = [];
+      try {
+        const { data, error } = await sb.functions.invoke('define', { body: { items: batch.map(b => ({ word: b.word, book: b.book })) } });
+        if (!error && data && Array.isArray(data.results)) results = data.results;
+      } catch {}
+      const rows = [];
+      batch.forEach((it, j) => {
+        const r = results[j] && results[j].definition ? results[j] : null;
+        const w = (useBase && r && r.word ? String(r.word) : it.word).toLowerCase().trim();
+        if (taken.has(w)) { dupes++; return; }
+        taken.add(w);
+        if (!r) undefinedN++;
+        rows.push({
+          ...toRow({ word: w, partOfSpeech: r?.partOfSpeech, phonetic: r?.phonetic, definition: r?.definition,
+            bookTitle: it.book, pageNumber: it.chapter, tags: ['kobo'], status: 'LEARNING', audioUrl: r?.audioUrl }),
+          source: 'kobo', kobo_key: it.key, created_at: new Date(Date.parse(it.date) || Date.now()).toISOString()
+        });
+      });
+      if (!rows.length) continue;
+      const { error } = await sb.from('words').upsert(rows, { onConflict: 'user_id,kobo_key', ignoreDuplicates: true });
+      if (error) { failed += rows.length; } else saved += rows.length;
+    }
+    koboBusy = false; koboDone = true;
+    const parts = [`Imported ${saved} word${saved === 1 ? '' : 's'}.`];
+    if (dupes) parts.push(`${dupes} matched a word already in your library and ${dupes === 1 ? 'was' : 'were'} skipped.`);
+    if (undefinedN) parts.push(`${undefinedN} had no definition; tap ✎ on ${undefinedN === 1 ? 'it' : 'them'} to add one.`);
+    if (failed) parts.push(`${failed} couldn't be saved. Choose the file again to retry them.`);
+    status($('koboProgress'), parts.join(' '), !!failed);
+    renderKobo();
     loadWords();
   });
 })();
