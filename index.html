@@ -120,8 +120,8 @@ main { padding-block: 1rem 1.5rem; padding-left: max(16px, env(safe-area-inset-l
 .pill.LEARNING { background: var(--warn-soft); color: var(--warn) }
 .pill.MASTERED { background: var(--good-soft); color: var(--good) }
 .def { margin: 0; font-size: .85rem; line-height: 1.5; white-space: pre-line }
-.ex { margin: 0; font-size: .82rem; line-height: 1.5; font-style: italic; color: var(--muted) }
 .field-head { display: flex; justify-content: space-between; align-items: center; gap: .5rem }
+#exampleStatus:empty { display: none }
 .btn-xs { padding: .2rem .55rem; font-size: .7rem; border-radius: .55rem }
 .ctx { margin: 0; white-space: pre-line; font-family: var(--quote); font-style: normal; font-size: .85rem; line-height: 1.5; color: var(--muted); background: var(--surface); border-left: 2px solid var(--accent); border-radius: 0 .5rem .5rem 0; padding: .3rem .6rem .3rem .7rem }
 .foot { display: flex; justify-content: space-between; align-items: center; gap: .5rem; flex-wrap: wrap; border-top: 1px solid var(--line); padding-top: .45rem; font-size: .68rem; font-weight: 500; color: var(--muted) }
@@ -295,8 +295,7 @@ nav.tabs button[aria-current="page"] { color: var(--accent) }
               <button class="iconbtn" id="speakBtn" aria-label="Pronounce"><svg class="i"><use href="#i-speaker"/></svg></button>
             </div>
             <div><p class="label">Definition</p><p class="def" id="bDef"></p></div>
-            <div id="bExWrap"><p class="label">Example</p><p class="ex" id="bEx"></p></div>
-            <div id="bCtxWrap"><p class="label">From your book</p><p class="ctx" id="bCtx"></p></div>
+            <div id="bCtxWrap"><p class="label">Example</p><p class="ctx" id="bCtx"></p></div>
           </div>
         </div>
       </div>
@@ -328,8 +327,7 @@ nav.tabs button[aria-current="page"] { color: var(--accent) }
         <div class="field"><label for="fPhonIn">Pronunciation</label><input id="fPhonIn" placeholder="/ˈwɜːd/"></div>
       </div>
       <div class="field"><label for="fDefIn">Definition</label><textarea id="fDefIn" rows="4" placeholder="Fills in automatically, or write your own"></textarea></div>
-      <div class="field"><div class="field-head"><label for="fExIn">Example</label><button type="button" class="btn btn-soft btn-xs" id="exampleBtn">Suggest example</button></div><textarea id="fExIn" rows="2" placeholder="A sentence using the word" style="font-style:italic"></textarea><div class="status-line" id="exampleStatus"></div></div>
-      <div class="field"><label for="fCtxIn">Sentence from your Kobo</label><textarea id="fCtxIn" rows="2" class="serif" placeholder="Paste or type the line you read it in"></textarea></div>
+      <div class="field"><div class="field-head"><label for="fCtxIn">Example sentence</label><button type="button" class="btn btn-soft btn-xs" id="exampleBtn">Suggest</button></div><textarea id="fCtxIn" rows="2" class="serif" placeholder="The line you read it in, or tap Suggest"></textarea><div class="status-line" id="exampleStatus"></div></div>
       <div class="grid3">
         <div class="field"><label for="fBookIn">Book</label><input id="fBookIn" list="bookList" placeholder="e.g. Middlemarch"><datalist id="bookList"></datalist></div>
         <div class="field"><label for="fPageIn">Chapter / page</label><input id="fPageIn" list="chapterList" placeholder="Ch. 3" autocomplete="off"><datalist id="chapterList"></datalist></div>
@@ -370,7 +368,7 @@ nav.tabs button[aria-current="page"] { color: var(--accent) }
       <button class="btn btn-primary" id="koboBtn" style="align-self:flex-start">Choose Kobo file</button>
       <div class="status-line" id="koboStatus"></div>
     </div>
-    <div class="panel"><strong>Example sentences</strong><p id="exPanelText">Claude writes one example sentence for each word that doesn't have one yet.</p>
+    <div class="panel"><strong>Example sentences</strong><p id="exPanelText">Claude writes a sentence for each word that doesn't have one yet. Sentences you've already added are kept.</p>
       <button class="btn btn-ghost" id="addExamplesBtn" style="align-self:flex-start">Add examples</button>
       <div class="status-line" id="addExamplesStatus"></div>
     </div>
@@ -451,10 +449,10 @@ nav.tabs button[aria-current="page"] { color: var(--accent) }
   // DB row <-> app object
   const fromRow = r => ({ id: r.id, word: r.word, partOfSpeech: r.part_of_speech, phonetic: r.phonetic, definition: r.definition,
     context: r.context, bookTitle: r.book_title, pageNumber: r.page_number, tags: r.tags || [], status: r.status,
-    audioUrl: r.audio_url, createdAt: Date.parse(r.created_at), source: r.source || 'manual', koboKey: r.kobo_key || null, example: r.example || '' });
+    audioUrl: r.audio_url, createdAt: Date.parse(r.created_at), source: r.source || 'manual', koboKey: r.kobo_key || null });
   const toRow = w => ({ word: w.word, part_of_speech: w.partOfSpeech || '', phonetic: w.phonetic || '', definition: w.definition || '',
     context: w.context || '', book_title: w.bookTitle || '', page_number: w.pageNumber || '', tags: w.tags || [],
-    status: w.status === 'MASTERED' ? 'MASTERED' : 'LEARNING', audio_url: w.audioUrl || '', example: w.example || '' });
+    status: w.status === 'MASTERED' ? 'MASTERED' : 'LEARNING', audio_url: w.audioUrl || '' });
 
   // ---------- theme ----------
   const root = document.documentElement;
@@ -590,7 +588,6 @@ nav.tabs button[aria-current="page"] { color: var(--accent) }
         </div>
         <span class="confirm" data-confirm="${esc(w.id)}" hidden>Delete this word? <button class="btn btn-learning" data-yes="${esc(w.id)}">Delete</button><button class="linkbtn" data-no="${esc(w.id)}">Keep</button></span>
         ${w.definition ? `<p class="def">${esc(w.definition)}</p>` : ''}
-        ${w.example ? `<p class="ex">${esc(w.example)}</p>` : ''}
         ${w.context ? `<p class="ctx">"${esc(w.context)}"</p>` : ''}
         <div class="foot">
           <span>${w.bookTitle ? esc(w.bookTitle) + (w.pageNumber ? ' (' + esc(w.pageNumber) + ')' : '') : 'Standalone word'}</span>
@@ -615,7 +612,7 @@ nav.tabs button[aria-current="page"] { color: var(--accent) }
   $('sortBtn').addEventListener('click', () => { sortAsc = !sortAsc; $('sortBtn').textContent = 'Sort: ' + (sortAsc ? 'Oldest' : 'Newest') + ' ⇅'; renderLibrary(); });
 
   // ---------- add / edit ----------
-  const F = { word: 'fWordIn', partOfSpeech: 'fPosIn', phonetic: 'fPhonIn', definition: 'fDefIn', example: 'fExIn', context: 'fCtxIn', bookTitle: 'fBookIn', pageNumber: 'fPageIn', status: 'fStatusIn', audioUrl: 'fAudioIn' };
+  const F = { word: 'fWordIn', partOfSpeech: 'fPosIn', phonetic: 'fPhonIn', definition: 'fDefIn', context: 'fCtxIn', bookTitle: 'fBookIn', pageNumber: 'fPageIn', status: 'fStatusIn', audioUrl: 'fAudioIn' };
   function resetSheet() { status($('defineStatus')); status($('saveStatus')); status($('exampleStatus')); $('suggest').hidden = true; $('suggest').innerHTML = ''; }
   function openAdd(word = '', ctx = '') {
     editId = null; $('sheetTitle').textContent = 'Add word';
@@ -653,7 +650,7 @@ nav.tabs button[aria-current="page"] { color: var(--accent) }
         if (body.word && body.word.toLowerCase() !== word.toLowerCase()) $('fWordIn').value = body.word;
         $('fPosIn').value = body.partOfSpeech || ''; $('fPhonIn').value = body.phonetic || '';
         $('fDefIn').value = body.definition; $('fAudioIn').value = body.audioUrl || '';
-        if (body.example) $('fExIn').value = body.example;
+        if (body.example && !$('fCtxIn').value.trim()) $('fCtxIn').value = body.example;
         status($('defineStatus'), 'From ' + (body.source || 'the dictionary') + '. Edit anything before saving.');
       } else if (body && body.suggestions && body.suggestions.length) {
         status($('defineStatus'), 'Not found. Did you mean:', true);
@@ -671,7 +668,7 @@ nav.tabs button[aria-current="page"] { color: var(--accent) }
     e.preventDefault();
     const w = {
       word: $('fWordIn').value.trim().toLowerCase(), partOfSpeech: $('fPosIn').value.trim(), phonetic: $('fPhonIn').value.trim(),
-      definition: $('fDefIn').value.trim(), example: $('fExIn').value.trim(), context: $('fCtxIn').value.trim(), bookTitle: $('fBookIn').value.trim(),
+      definition: $('fDefIn').value.trim(), context: $('fCtxIn').value.trim(), bookTitle: $('fBookIn').value.trim(),
       pageNumber: expandChapter($('fBookIn').value, $('fPageIn').value), tags: $('fTagsIn').value.split(',').map(t => t.trim()).filter(Boolean),
       status: $('fStatusIn').value, audioUrl: $('fAudioIn').value
     };
@@ -756,7 +753,6 @@ nav.tabs button[aria-current="page"] { color: var(--accent) }
     $('fStatus').className = 'pill ' + (w.status === 'MASTERED' ? 'MASTERED' : 'LEARNING');
     $('bWord').textContent = w.word; $('bPos').textContent = w.partOfSpeech || ''; $('bPos').hidden = !w.partOfSpeech;
     $('bDef').textContent = w.definition || 'No definition saved.';
-    $('bExWrap').hidden = !w.example; $('bEx').textContent = w.example || '';
     $('bCtxWrap').hidden = !w.context; $('bCtx').textContent = w.context ? '"' + w.context + '"' : '';
   }
   async function mark(st) {
@@ -806,7 +802,7 @@ nav.tabs button[aria-current="page"] { color: var(--accent) }
   }
   $('exportJson').addEventListener('click', () => download(`marginalia_${stamp()}.json`, JSON.stringify(words, null, 2), 'application/json'));
   $('exportCsv').addEventListener('click', () => {
-    const cols = ['word', 'partOfSpeech', 'phonetic', 'definition', 'example', 'context', 'bookTitle', 'pageNumber', 'status', 'tags'];
+    const cols = ['word', 'partOfSpeech', 'phonetic', 'definition', 'context', 'bookTitle', 'pageNumber', 'status', 'tags'];
     const q = v => '"' + String(Array.isArray(v) ? v.join(';') : (v ?? '')).replace(/"/g, '""') + '"';
     download(`marginalia_${stamp()}.csv`, [cols.join(','), ...words.map(w => cols.map(c => q(w[c])).join(','))].join('\n'), 'text/csv');
   });
@@ -838,20 +834,20 @@ nav.tabs button[aria-current="page"] { color: var(--accent) }
     if (!word) { status($('exampleStatus'), 'Enter the word first.', true); return; }
     $('exampleBtn').disabled = true; status($('exampleStatus'), 'Writing an example…');
     try {
-      const [r] = await fetchExamples([{ word, definition: $('fDefIn').value.trim(), context: $('fCtxIn').value.trim(), book: $('fBookIn').value.trim() }]);
-      if (r && r.example) { $('fExIn').value = r.example; status($('exampleStatus')); }
+      const [r] = await fetchExamples([{ word, definition: $('fDefIn').value.trim(), context: '', book: $('fBookIn').value.trim() }]);
+      if (r && r.example) { $('fCtxIn').value = r.example; status($('exampleStatus')); }
       else status($('exampleStatus'), "Couldn't write an example for this word. Type your own.", true);
     } catch { status($('exampleStatus'), "Couldn't reach Claude. Check your connection and try again.", true); }
     finally { $('exampleBtn').disabled = false; }
   });
   function syncExamplePanel() {
-    const n = words.filter(w => !w.example).length;
-    $('addExamplesBtn').textContent = n ? `Add examples to ${n} word${n === 1 ? '' : 's'}` : 'All words have examples';
+    const n = words.filter(w => !(w.context || '').trim()).length;
+    $('addExamplesBtn').textContent = n ? `Add sentences to ${n} word${n === 1 ? '' : 's'}` : 'Every word has a sentence';
     $('addExamplesBtn').disabled = !n;
   }
   $('openSettings').addEventListener('click', syncExamplePanel);
   $('addExamplesBtn').addEventListener('click', async () => {
-    const todo = words.filter(w => !w.example);
+    const todo = words.filter(w => !(w.context || '').trim());
     if (!todo.length) return;
     $('addExamplesBtn').disabled = true;
     let done = 0, failed = 0;
@@ -859,15 +855,15 @@ nav.tabs button[aria-current="page"] { color: var(--accent) }
       const batch = todo.slice(i, i + 10);
       status($('addExamplesStatus'), `Writing examples… ${Math.min(i + batch.length, todo.length)} of ${todo.length}`);
       let results = [];
-      try { results = await fetchExamples(batch.map(w => ({ word: w.word, definition: w.definition, context: w.context, book: w.bookTitle }))); } catch {}
+      try { results = await fetchExamples(batch.map(w => ({ word: w.word, definition: w.definition, context: '', book: w.bookTitle }))); } catch {}
       await Promise.all(batch.map(async (w, j) => {
         const ex = results[j] && results[j].example;
         if (!ex) { failed++; return; }
-        const { error } = await sb.from('words').update({ example: ex }).eq('id', w.id);
-        if (error) failed++; else { w.example = ex; done++; }
+        const { error } = await sb.from('words').update({ context: ex }).eq('id', w.id);
+        if (error) failed++; else { w.context = ex; done++; }
       }));
     }
-    status($('addExamplesStatus'), `Added examples to ${done} word${done === 1 ? '' : 's'}.` + (failed ? ` ${failed} couldn't be done; tap the button to retry them.` : ''), !!failed);
+    status($('addExamplesStatus'), `Added sentences to ${done} word${done === 1 ? '' : 's'}.` + (failed ? ` ${failed} couldn't be done; tap the button to retry them.` : ''), !!failed);
     renderLibrary(); syncExamplePanel();
   });
 
@@ -1052,7 +1048,7 @@ nav.tabs button[aria-current="page"] { color: var(--accent) }
         taken.add(w);
         if (!r) undefinedN++;
         rows.push({
-          ...toRow({ word: w, partOfSpeech: r?.partOfSpeech, phonetic: r?.phonetic, definition: r?.definition, example: r?.example,
+          ...toRow({ word: w, partOfSpeech: r?.partOfSpeech, phonetic: r?.phonetic, definition: r?.definition, context: r?.example,
             bookTitle: it.book, pageNumber: it.chapter, tags: ['kobo'], status: 'LEARNING', audioUrl: r?.audioUrl }),
           source: 'kobo', kobo_key: it.key, created_at: new Date(Date.parse(it.date) || Date.now()).toISOString()
         });
