@@ -175,7 +175,7 @@ nav.tabs button[aria-current="page"] { color: var(--accent) }
 .field textarea { resize: vertical; line-height: 1.45 }
 .field textarea.serif { font-family: var(--quote) }
 .grid2 { display: grid; grid-template-columns: 1fr 1fr; gap: .6rem }
-.grid3 { display: grid; grid-template-columns: 2fr 1fr; gap: .6rem }
+.grid3 { display: grid; grid-template-columns: 1fr; gap: .7rem }
 .inline { display: flex; gap: .45rem }
 .inline input { flex: 1 }
 .status-line { font-size: .75rem; color: var(--muted); min-height: 1em }
@@ -327,7 +327,7 @@ nav.tabs button[aria-current="page"] { color: var(--accent) }
       <div class="field"><label for="fCtxIn">Sentence from your Kobo</label><textarea id="fCtxIn" rows="2" class="serif" placeholder="Paste or type the line you read it in"></textarea></div>
       <div class="grid3">
         <div class="field"><label for="fBookIn">Book</label><input id="fBookIn" list="bookList" placeholder="e.g. Middlemarch"><datalist id="bookList"></datalist></div>
-        <div class="field"><label for="fPageIn">Page / ch.</label><input id="fPageIn" placeholder="p. 42"></div>
+        <div class="field"><label for="fPageIn">Chapter / page</label><input id="fPageIn" list="chapterList" placeholder="Ch. 3" autocomplete="off"><datalist id="chapterList"></datalist></div>
       </div>
       <div class="grid2">
         <div class="field"><label for="fTagsIn">Tags</label><input id="fTagsIn" placeholder="fiction, philosophy"></div>
@@ -428,6 +428,7 @@ nav.tabs button[aria-current="page"] { color: var(--accent) }
 
   const $ = (id) => document.getElementById(id);
   let words = [], editId = null, sortAsc = false, queue = [], qi = 0, user = null, lastBook = '';
+  let books = new Map(); // lowercased title -> { title, chapters: ['Ch. 1: …', …] }
 
   // ---------- helpers ----------
   const esc = (s) => String(s ?? '').replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
@@ -515,7 +516,31 @@ nav.tabs button[aria-current="page"] { color: var(--accent) }
     showBanner('');
     words = data.map(fromRow);
     renderLibrary();
+    const b = await sb.from('books').select('title,chapters');
+    if (!b.error) books = new Map(b.data.map(x => [x.title.trim().toLowerCase(), { title: x.title, chapters: x.chapters || [] }]));
   }
+
+  // ---------- chapters ----------
+  const bookChapters = t => books.get(String(t || '').trim().toLowerCase())?.chapters || [];
+  // "c. 7", "ch 7", "chapter 7" or "7" -> "Ch. 7: The Dendur Derby" when the book's contents are known
+  function expandChapter(book, v) {
+    v = String(v || '').trim();
+    const m = v.match(/^(?:c|ch|chap|chapter)?\.?\s*(\d+)$/i); if (!m) return v;
+    return bookChapters(book).find(c => c === 'Ch. ' + m[1] || c.startsWith('Ch. ' + m[1] + ':')) || v;
+  }
+  function lastChapterFor(book) {
+    const t = String(book || '').trim().toLowerCase(); if (!t) return '';
+    const w = words.filter(x => (x.bookTitle || '').trim().toLowerCase() === t && x.pageNumber).sort((a, b) => b.createdAt - a.createdAt)[0];
+    return w ? expandChapter(book, w.pageNumber) : '';
+  }
+  function fillChapterList() {
+    $('chapterList').innerHTML = bookChapters($('fBookIn').value).map(c => `<option value="${esc(c)}">`).join('');
+  }
+  $('fBookIn').addEventListener('input', () => {
+    fillChapterList();
+    if (!editId && !$('fPageIn').value.trim()) $('fPageIn').value = lastChapterFor($('fBookIn').value);
+  });
+  $('fPageIn').addEventListener('change', () => { $('fPageIn').value = expandChapter($('fBookIn').value, $('fPageIn').value); });
   document.addEventListener('visibilitychange', () => { if (!document.hidden && user) loadWords(); });
 
   // ---------- library ----------
@@ -585,7 +610,10 @@ nav.tabs button[aria-current="page"] { color: var(--accent) }
   function openAdd(word = '', ctx = '') {
     editId = null; $('sheetTitle').textContent = 'Add word';
     $('wordForm').reset(); $('fAudioIn').value = '';
-    $('fWordIn').value = word; $('fCtxIn').value = ctx; $('fBookIn').value = lastBook;
+    const recent = words.slice().sort((a, b) => b.createdAt - a.createdAt)[0];
+    const book = lastBook || recent?.bookTitle || '';
+    $('fWordIn').value = word; $('fCtxIn').value = ctx; $('fBookIn').value = book;
+    $('fPageIn').value = lastChapterFor(book); fillChapterList();
     resetSheet(); open('wordSheet');
     if (word) define();
   }
@@ -594,6 +622,7 @@ nav.tabs button[aria-current="page"] { color: var(--accent) }
     editId = id; $('sheetTitle').textContent = 'Edit word';
     for (const [k, el] of Object.entries(F)) $(el).value = w[k] || (k === 'status' ? 'LEARNING' : '');
     $('fTagsIn').value = (w.tags || []).join(', ');
+    fillChapterList();
     resetSheet(); open('wordSheet');
   }
   $('quickForm').addEventListener('submit', (e) => { e.preventDefault(); const w = $('quickInput').value.trim(); if (w) openAdd(w); });
@@ -632,7 +661,7 @@ nav.tabs button[aria-current="page"] { color: var(--accent) }
     const w = {
       word: $('fWordIn').value.trim().toLowerCase(), partOfSpeech: $('fPosIn').value.trim(), phonetic: $('fPhonIn').value.trim(),
       definition: $('fDefIn').value.trim(), context: $('fCtxIn').value.trim(), bookTitle: $('fBookIn').value.trim(),
-      pageNumber: $('fPageIn').value.trim(), tags: $('fTagsIn').value.split(',').map(t => t.trim()).filter(Boolean),
+      pageNumber: expandChapter($('fBookIn').value, $('fPageIn').value), tags: $('fTagsIn').value.split(',').map(t => t.trim()).filter(Boolean),
       status: $('fStatusIn').value, audioUrl: $('fAudioIn').value
     };
     if (!w.word) return;
@@ -806,7 +835,8 @@ nav.tabs button[aria-current="page"] { color: var(--accent) }
   function chapterLabel(t) {
     t = String(t || '').trim();
     if (!t || /\.x?html?$|^(part|index_split|chapter)?[_-]?\d+$/i.test(t) || /\.x?html?#/i.test(t)) return '';
-    return /^\d+\s*[:.]/.test(t) ? 'Ch. ' + t : t;
+    const m = t.match(/^(\d+)\s*[:.]\s*(.*)$/);
+    return m ? 'Ch. ' + m[1] + (m[2] ? ': ' + m[2] : '') : t;
   }
   function bookFromVolume(id) {
     try { const f = decodeURIComponent(String(id).split('/').pop() || ''); return f.replace(/\.(kepub\.)?epub$|\.pdf$/i, '').trim(); } catch { return ''; }
@@ -844,6 +874,40 @@ nav.tabs button[aria-current="page"] { color: var(--accent) }
         date: r.date, key: r.word + '|' + r.vol, on: true
       };
     }).sort((a, b) => String(b.date).localeCompare(String(a.date)));
+  }
+
+  const FRONT_BACK = /^(cover|title page|copyright|dedication|epigraph|(table of )?contents|also by\b|about the (author|publisher)|acknowledge?ments?|notes(\s+\d+)?$|a note (on|about)\b|index$|bibliography|newsletter|praise for\b|credits$|searchable terms)/i;
+  function parseContents(db) {
+    const titles = new Map(rowsOf(db, `SELECT ContentID AS id, Title AS title FROM content WHERE ContentType = 6`).map(r => [r.id, r.title]));
+    const toc = new Map();
+    for (const r of rowsOf(db, `SELECT BookID AS book, Title AS title FROM content WHERE BookID IS NOT NULL AND BookID <> '' ORDER BY BookID, VolumeIndex`)) {
+      const label = chapterLabel(r.title);
+      if (!label || FRONT_BACK.test(label)) continue;
+      if (!toc.has(r.book)) toc.set(r.book, []);
+      const list = toc.get(r.book); if (!list.includes(label)) list.push(label);
+    }
+    return [...toc].map(([id, chapters]) => ({ title: (titles.get(id) || bookFromVolume(id) || '').trim(), chapters }))
+      .filter(b => b.title && b.chapters.some(c => c.startsWith('Ch. ')));
+  }
+  // Save each book's contents, then turn short chapter entries ("c. 3") into full names
+  async function saveContents(list) {
+    if (!list.length) return { saved: 0, fixed: 0 };
+    const { error } = await sb.from('books').upsert(list.map(b => ({ title: b.title, chapters: b.chapters })), { onConflict: 'user_id,title' });
+    if (error) return { saved: 0, fixed: 0 };
+    list.forEach(b => books.set(b.title.toLowerCase(), b));
+    const changes = new Map();
+    for (const w of words) {
+      if (!w.pageNumber || !bookChapters(w.bookTitle).length) continue;
+      const full = expandChapter(w.bookTitle, w.pageNumber);
+      if (full !== w.pageNumber) changes.set(w.bookTitle + '\u0000' + w.pageNumber, { book: w.bookTitle, from: w.pageNumber, to: full });
+    }
+    let fixed = 0;
+    for (const c of changes.values()) {
+      const { error } = await sb.from('words').update({ page_number: c.to }).eq('book_title', c.book).eq('page_number', c.from);
+      if (!error) words.forEach(w => { if (w.bookTitle === c.book && w.pageNumber === c.from) { w.pageNumber = c.to; fixed++; } });
+    }
+    if (fixed) renderLibrary();
+    return { saved: list.length, fixed };
   }
 
   let koboItems = [], koboBusy = false, koboDone = false;
@@ -890,13 +954,17 @@ nav.tabs button[aria-current="page"] { color: var(--accent) }
       const db = new SQL.Database(new Uint8Array(await file.arrayBuffer()));
       let all;
       try { all = parseKobo(db); } catch { status($('koboStatus'), "This file has no My Words list. Choose KoboReader.sqlite from the Kobo's .kobo folder.", true); db.close(); return; }
+      let contents = [];
+      try { contents = parseContents(db); } catch {}
       db.close();
+      const cs = await saveContents(contents);
       const haveWords = new Set(words.map(w => (w.word || '').toLowerCase()));
       const haveKeys = new Set(words.map(w => w.koboKey).filter(Boolean));
       koboItems = all.filter(i => !haveWords.has(i.word) && !haveKeys.has(i.key));
       const skipped = all.length - koboItems.length;
       koboDone = false; koboBusy = false;
-      $('koboSub').textContent = `From ${all.length} word${all.length === 1 ? '' : 's'} in My Words` + (skipped ? ` · ${skipped} already in your library, hidden` : '');
+      $('koboSub').textContent = `From ${all.length} word${all.length === 1 ? '' : 's'} in My Words` + (skipped ? ` · ${skipped} already in your library, hidden` : '') +
+        (cs.saved ? ` · Chapters saved for ${cs.saved} book${cs.saved === 1 ? '' : 's'}` : '') + (cs.fixed ? ` · ${cs.fixed} chapter${cs.fixed === 1 ? '' : 's'} tidied` : '');
       status($('koboProgress')); status($('koboStatus'));
       renderKobo();
       close('settingsSheet'); open('koboSheet');
