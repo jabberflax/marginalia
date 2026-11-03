@@ -13,7 +13,7 @@ const CLAUDE_MODEL = "claude-haiku-5-5";
 const STYLE = `You write entries for a reader's personal vocabulary notebook. Words come from books they read on a Kobo (often history, politics and literary non-fiction).
 
 For the given word, return JSON only, no prose, in this exact shape:
-{"word": string, "partOfSpeech": string, "phonetic": string, "definition": string, "note": string}
+{"word": string, "partOfSpeech": string, "phonetic": string, "definition": string, "note": string, "example": string}
 
 Rules:
 - word: the dictionary (base) form, lowercase unless a proper noun. "knaves" -> "knave", "extolling" -> "extol", "deluged" -> "deluge". Keep multi-word phrases as phrases ("roman à clef").
@@ -21,18 +21,19 @@ Rules:
 - phonetic: American pronunciation in Merriam-Webster respelling style, wrapped in backslashes, with hyphens between syllables and a stress mark before the stressed syllable, e.g. \\kə-ˈjōl\\, \\jü-ˈdi-shəs\\, \\ˈprä-fli-gət\\.
 - definition: one sentence in plain modern English, at most about 20 words, never using the word itself. If the word has several senses, give the one most likely meant given the sentence and book provided; otherwise the most common literary sense.
 - note: optional, empty string if nothing useful. One short line on register or tone (archaic, formal, derogatory, admiring) or a brief origin when it genuinely helps remember the meaning. Must be accurate; leave empty if unsure.
+- example: one natural sentence of about 12-25 words that uses the word (in any inflection) in the sense defined, showing how it is typically used. Original, not a quotation; avoid real living people.
 - If the input is not a real English word or is badly misspelled, return {"error": "not_found", "suggestions": [up to 5 likely intended words]}.
 
 Examples:
-{"word":"knave","partOfSpeech":"noun","phonetic":"\\\\ˈnāv\\\\","definition":"A dishonest, unscrupulous man; a rogue.","note":"Archaic. Originally meant a boy or male servant."}
-{"word":"muckraker","partOfSpeech":"noun","phonetic":"\\\\ˈmək-ˌrā-kər\\\\","definition":"A journalist who exposes corruption or scandal, especially among the powerful.","note":"Popularised by Theodore Roosevelt in 1906, after a character in The Pilgrim's Progress who rakes muck instead of looking up."}
-{"word":"dogged","partOfSpeech":"adjective","phonetic":"\\\\ˈdȯ-gəd\\\\","definition":"Showing stubborn persistence despite difficulty.","note":"Usually admiring, as in \\"dogged determination\\"."}
-{"word":"extol","partOfSpeech":"verb","phonetic":"\\\\ik-ˈstōl\\\\","definition":"To praise someone or something enthusiastically.","note":"Formal."}
-{"word":"demagogue","partOfSpeech":"noun","phonetic":"\\\\ˈde-mə-ˌgäg\\\\","definition":"A political leader who wins support by playing on people's fears and prejudices rather than using reason.","note":"From Greek for \\"leader of the people\\"; now almost always negative."}`;
+{"word":"knave","partOfSpeech":"noun","phonetic":"\\\\ˈnāv\\\\","definition":"A dishonest, unscrupulous man; a rogue.","note":"Archaic. Originally meant a boy or male servant.","example":"Everyone at court knew him for a knave who would sell a friend for a favour."}
+{"word":"muckraker","partOfSpeech":"noun","phonetic":"\\\\ˈmək-ˌrā-kər\\\\","definition":"A journalist who exposes corruption or scandal, especially among the powerful.","note":"Popularised by Theodore Roosevelt in 1906, after a character in The Pilgrim's Progress who rakes muck instead of looking up.","example":"The muckraker spent two years digging through the company's records before publishing her exposé."}
+{"word":"dogged","partOfSpeech":"adjective","phonetic":"\\\\ˈdȯ-gəd\\\\","definition":"Showing stubborn persistence despite difficulty.","note":"Usually admiring, as in \\"dogged determination\\".","example":"Her dogged pursuit of the story finally forced the board to release the documents."}
+{"word":"extol","partOfSpeech":"verb","phonetic":"\\\\ik-ˈstōl\\\\","definition":"To praise someone or something enthusiastically.","note":"Formal.","example":"The brochure extols the resort's quiet beaches and award-winning restaurant."}
+{"word":"demagogue","partOfSpeech":"noun","phonetic":"\\\\ˈde-mə-ˌgäg\\\\","definition":"A political leader who wins support by playing on people's fears and prejudices rather than using reason.","note":"From Greek for \\"leader of the people\\"; now almost always negative.","example":"The demagogue promised easy answers and blamed every problem on outsiders."}`;
 
 const BATCH_RULE = `\n\nBATCH MODE: when given a numbered list of words, return a JSON array (and nothing else) with exactly one object per input word, in the same order. Each object follows the shape and rules above (or the error shape), plus an "input" field echoing the word exactly as given.`;
 
-type Entry = { source: string; word: string; partOfSpeech: string; phonetic: string; definition: string; audioUrl: string };
+type Entry = { source: string; word: string; partOfSpeech: string; phonetic: string; definition: string; example?: string; audioUrl: string };
 
 const toEntry = (o: any, fallbackWord: string): Entry | null => {
   if (!o || o.error || !o.definition) return null;
@@ -42,6 +43,7 @@ const toEntry = (o: any, fallbackWord: string): Entry | null => {
     partOfSpeech: String(o.partOfSpeech || ""),
     phonetic: String(o.phonetic || ""),
     definition: String(o.definition).trim() + (o.note ? "\n" + String(o.note).trim() : ""),
+    example: String(o.example || "").trim(),
     audioUrl: "",
   };
 };
@@ -151,6 +153,26 @@ async function dictionaryLookup(w: string, mKey?: string) {
   return { entry: (fd as Entry) || null, suggestions };
 }
 
+const EXAMPLE_SYSTEM = `You write example sentences for a reader's personal vocabulary notebook.
+For each numbered word, write one natural sentence of about 12-25 words that uses the word (any inflection is fine) in the sense given by its definition, or the sentence it was read in when provided. Original, not a quotation; avoid real living people; plain modern English.
+Return a JSON array only, one object per word in the same order: {"input": the word exactly as given, "example": the sentence}.`;
+
+async function claudeExamples(items: { word: string; definition: string; context: string; book: string }[], key: string): Promise<string[]> {
+  const user = items.map((i, n) => `${n + 1}. ${i.word}` +
+    (i.definition ? `\n   Definition: ${i.definition.split("\n")[0]}` : "") +
+    (i.context ? `\n   Read in: ${i.context}` : "") +
+    (i.book ? `\n   Book: ${i.book}` : "")).join("\n");
+  const text = await askClaude(EXAMPLE_SYSTEM, user, key, 80 * items.length + 200);
+  const m = text?.match(/\[[\s\S]*\]/);
+  if (!m) return items.map(() => "");
+  let arr: any[] = [];
+  try { arr = JSON.parse(m[0]); } catch { return items.map(() => ""); }
+  return items.map((it, n) => {
+    const o = arr.find((x) => x && String(x.input || "").toLowerCase() === it.word.toLowerCase()) || arr[n];
+    return o && o.example ? String(o.example).trim() : "";
+  });
+}
+
 const cleanWord = (s: unknown) => String(s || "").trim().replace(/^[^\p{L}]+|[^\p{L}]+$/gu, "").toLowerCase().slice(0, 60);
 
 Deno.serve(async (req) => {
@@ -159,6 +181,20 @@ Deno.serve(async (req) => {
     const body = await req.json();
     const aKey = Deno.env.get("ANTHROPIC_API_KEY");
     const mKey = Deno.env.get("MW_API_KEY");
+
+    // Examples only (Suggest example button, Add examples in Settings):
+    // { examples: [{ word, definition, context, book }] } -> { results: [{ input, example }] }
+    if (Array.isArray(body.examples)) {
+      const items = body.examples.slice(0, 20).map((i: any) => ({
+        word: String(i?.word || "").trim().slice(0, 60),
+        definition: String(i?.definition || "").trim().slice(0, 400),
+        context: String(i?.context || "").trim().slice(0, 600),
+        book: String(i?.book || "").trim().slice(0, 200),
+      })).filter((i: any) => i.word);
+      if (!aKey) return json({ results: items.map((i: any) => ({ input: i.word, example: "" })), error: "no_claude_key" });
+      const ex = await claudeExamples(items, aKey).catch((e) => { console.error(e); return items.map(() => ""); });
+      return json({ results: items.map((i: any, n: number) => ({ input: i.word, example: ex[n] })) });
+    }
 
     // Batch mode (Kobo import): { items: [{ word, book }] } -> { results: [entry | { input, error }] }
     if (Array.isArray(body.items)) {
