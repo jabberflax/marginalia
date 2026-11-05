@@ -383,10 +383,12 @@ nav.tabs button[aria-current="page"] { color: var(--accent) }
 <div class="sheet-scrim" id="settingsSheet" hidden>
   <div class="sheet" role="dialog" aria-modal="true" aria-labelledby="setTitle">
     <div class="sheet-head"><h3 id="setTitle">Settings</h3><button class="iconbtn" data-close="settingsSheet" aria-label="Close"><svg class="i"><use href="#i-x"/></svg></button></div>
-    <div class="panel"><strong>Import from Kobo</strong><p>On a computer, connect your Kobo and choose <b>KoboReader.sqlite</b> from its hidden <b>.kobo</b> folder. Your My Words list is added here; the file stays on your computer.</p>
+    <div class="panel"><strong>Import from e-reader</strong><p>On a computer, connect your Kobo and choose either file. The file stays on your computer.</p>
+      <p><b>Kobo's reader:</b> <b>KoboReader.sqlite</b> in the hidden <b>.kobo</b> folder (your My Words list).<br><b>KOReader:</b> <b>vocabulary_builder.sqlite3</b> in <b>.adds/koreader/settings</b> (your Vocabulary builder).</p>
       <input type="file" id="koboFile" hidden>
-      <button class="btn btn-primary" id="koboBtn" style="align-self:flex-start">Choose Kobo file</button>
+      <button class="btn btn-primary" id="koboBtn" style="align-self:flex-start">Choose file</button>
       <div class="status-line" id="koboStatus"></div>
+      <p class="kobo-sub">Chinese definitions: <a href="https://www.mdbg.net/chinese/dictionary?page=cc-cedict" target="_blank" rel="noopener" style="color:inherit">CC-CEDICT</a> (MDBG), CC BY-SA 4.0.</p>
     </div>
     <div class="panel"><strong>Example sentences</strong><p id="exPanelText">Claude writes a sentence for each word that doesn't have one yet. Sentences you've already added are kept.</p>
       <button class="btn btn-ghost" id="addExamplesBtn" style="align-self:flex-start">Add examples</button>
@@ -427,7 +429,7 @@ nav.tabs button[aria-current="page"] { color: var(--accent) }
 <script>
 /* Self-update: compare this page's version with version.json (never cached) and reload once if newer. */
 (() => {
-  const APP_VERSION = '9';
+  const APP_VERSION = '10';
   async function check() {
     try {
       const r = await fetch('version.json?t=' + Date.now(), { cache: 'no-store' });
@@ -696,13 +698,76 @@ nav.tabs button[aria-current="page"] { color: var(--accent) }
   }
   $('fWordIn').addEventListener('input', updateFormLang);
 
+  // ---------- CC-CEDICT: Chinese definitions, loaded only when a Chinese word is looked up ----------
+  // Set USE_CLAUDE_ZH to true to send Chinese words to Claude (the define function) instead.
+  const USE_CLAUDE_ZH = false;
+  let cedictPromise = null;
+  function loadCedict() {
+    if (!cedictPromise) cedictPromise = (async () => {
+      const r = await fetch('data/cedict.tsv.gz?v=1');
+      if (!r.ok) throw new Error('cedict');
+      const buf = new Uint8Array(await r.arrayBuffer());
+      const text = buf[0] === 0x1f && buf[1] === 0x8b
+        ? await new Response(new Blob([buf]).stream().pipeThrough(new DecompressionStream('gzip'))).text()
+        : new TextDecoder().decode(buf);
+      const map = new Map(), add = (k, e) => { const l = map.get(k); if (l) l.push(e); else map.set(k, [e]); };
+      for (const line of text.split('\n')) {
+        if (!line || line[0] === '#') continue;
+        const [s, t, p, d] = line.split('\t');
+        const e = { s, t, p, g: (d || '').split('/') };
+        add(s, e); if (t !== s) add(t, e);
+      }
+      return map;
+    })().catch(err => { cedictPromise = null; throw err; });
+    return cedictPromise;
+  }
+  const VARIANT = /^(old |archaic |erhua |Japanese |Korean )?variant of |^see |^see also |^used in |^\(old\) variant/i;
+  const tidyGloss = g => g.replace(/(\S+)\|(\S+?)\[/g, '$2[').replace(/\[([^\]]+)\]/g, ' ($1)').replace(/\s+/g, ' ').trim();
+  function cedictEntry(map, word) {
+    const list = map.get(word); if (!list || !list.length) return null;
+    const score = e => (e.s === word ? 0 : 1) + (/^\p{Lu}/u.test(e.p) ? 2 : 0) + (e.g.every(g => VARIANT.test(g)) ? 4 : 0);
+    const sorted = [...list].sort((a, b) => score(a) - score(b));
+    const best = sorted[0], seen = new Set(), readings = [];
+    for (const e of sorted) {
+      if (e.s !== best.s || seen.has(e.p.toLowerCase()) || (readings.length && score(e) >= 4)) continue;
+      seen.add(e.p.toLowerCase()); readings.push(e); if (readings.length === 3) break;
+    }
+    const measure = [];
+    const glossOf = e => e.g.map(g => g.replace(/[;,]?\s*\(?CL:([^)/]*)\)?/g, (_, cl) => { measure.push(...cl.split(',').map(tidyGloss).filter(Boolean)); return ''; }).trim())
+      .filter(Boolean).map(tidyGloss).join('; ');
+    const py = e => e.p.replace(/ /g, '');
+    let definition = readings.length === 1 ? glossOf(readings[0]) : readings.map(e => py(e) + ': ' + glossOf(e)).join(' · ');
+    if (measure.length) definition += ' · measure word: ' + [...new Set(measure.map(m => m.replace(/ \((.+)\)$/, ' $1')))].join(', ');
+    const chars = [...best.s].length > 1 ? [...best.s].filter(c => hasHan(c)).map(c => {
+      const ce = (map.get(c) || []).filter(e => e.s === c && !e.g.every(g => VARIANT.test(g)))
+        .sort((a, b) => (/^\p{Lu}/u.test(a.p) ? 1 : 0) - (/^\p{Lu}/u.test(b.p) ? 1 : 0))[0];
+      const m = ce ? tidyGloss((ce.g.find(g => !/^CL:/.test(g) && !/^surname /i.test(g)) || ce.g[0] || '').replace(/[;,]?\s*\(?CL:[^)/]*\)?/g, '')) : '';
+      return { c, m: m.length > 40 ? m.slice(0, 38).replace(/[\s;,]+\S*$/, '') + '…' : m };
+    }) : [];
+    return { word: best.s, phonetic: readings.map(py).join(' / '), definition, chars, partOfSpeech: '', source: 'CC-CEDICT' };
+  }
+  async function defineZhLocal(word, seq) {
+    status($('defineStatus'), cedictPromise ? 'Looking up "' + word + '"…' : 'Loading the Chinese dictionary…');
+    let map;
+    try { map = await loadCedict(); }
+    catch { if (seq === lookupSeq) status($('defineStatus'), "Couldn't load the Chinese dictionary. Check your connection and tap Define again.", true); return; }
+    if (seq !== lookupSeq) return;
+    const r = cedictEntry(map, word);
+    if (!r) { status($('defineStatus'), 'Not in CC-CEDICT. Write your own definition, or check the characters.', true); return; }
+    $('fWordIn').value = r.word; $('fPosIn').value = ''; $('fPhonIn').value = r.phonetic;
+    $('fDefIn').value = r.definition; $('fAudioIn').value = ''; $('fCharsIn').value = JSON.stringify(r.chars);
+    updateFormLang();
+    status($('defineStatus'), 'From CC-CEDICT. Edit anything before saving.');
+  }
+
   let lookupSeq = 0;
   async function define() {
     const word = $('fWordIn').value.trim(); if (!word) return;
     const seq = ++lookupSeq;
     $('suggest').hidden = true;
-    status($('defineStatus'), 'Looking up "' + word + '"…');
     $('defineBtn').disabled = true;
+    if (hasHan(word) && !USE_CLAUDE_ZH) { try { await defineZhLocal(word, seq); } finally { if (seq === lookupSeq) $('defineBtn').disabled = false; } return; }
+    status($('defineStatus'), 'Looking up "' + word + '"…');
     try {
       const { data, error } = await sb.functions.invoke('define', { body: { word, context: $('fCtxIn').value.trim(), book: $('fBookIn').value.trim() } });
       if (seq !== lookupSeq) return;
@@ -1001,12 +1066,46 @@ nav.tabs button[aria-current="page"] { color: var(--accent) }
         word: r.word, raw: String(r.text).trim(), vol: r.vol, lang: hasHan(r.word) || /zh/i.test(String(r.dict || '')) ? 'zh' : 'en',
         book: (r.title || bookFromVolume(r.vol) || 'Unknown book').trim(),
         chapter: hits.length ? chapterLabel(hits[0].chapter) : '',
-        date: r.date, key: r.word + '|' + r.vol, on: true
+        date: r.date, key: r.word + '|' + r.vol, source: 'kobo', context: '', on: true
       };
     }).sort((a, b) => String(b.date).localeCompare(String(a.date)));
   }
 
-  const FRONT_BACK = /^(cover|title page|copyright|dedication|epigraph|(table of )?contents|also by\b|about the (author|publisher)|acknowledge?ments?|notes(\s+\d+)?$|a note (on|about)\b|index$|bibliography|newsletter|praise for\b|credits$|searchable terms)/i;
+  // KOReader's Vocabulary builder (vocabulary_builder.sqlite3): word, book, time, text either side of the word.
+  function shortTitle(t) {
+    const orig = String(t || '').trim();
+    let s = orig.replace(/\.(kepub\.)?(epub|pdf|mobi|azw3?|fb2|txt|cbz)$/i, '');
+    for (let k = 0; k < 3; k++) s = s.replace(/\s*[（(【\[][^（）()【】\[\]]*[）)】\]]\s*/g, ' ').trim();
+    s = s.replace(/^《(.+)》$/, '$1');
+    const m = s.match(/^(.{1,12}?(?:经典|文库|系列|丛书|书系|名著|译丛|作家榜))\s*[：:]\s*(.+)$/);
+    if (m) s = m[2];
+    return s.replace(/^《(.+)》$/, '$1').trim() || orig;
+  }
+  function sentenceAround(prev, word, next) {
+    prev = String(prev || ''); next = String(next || '');
+    const END = /[。！？!?…\n]|\.(?=\s)/g;
+    let start = -1, m; while ((m = END.exec(prev))) start = m.index + m[0].length;
+    let head = start >= 0 ? prev.slice(start).replace(/^[\s”’」』"')\]]+/, '') : (prev ? '…' + prev : '');
+    const e = /[。！？!?…\n]|\.(?=\s|$)/.exec(next);
+    let tail = e ? next.slice(0, e[0] === '\n' ? e.index : e.index + 1) : (next ? next + '…' : '');
+    if (e && e[0] !== '\n') { const q = next.slice(e.index + 1).match(/^[”’」』"')]+/); if (q) tail += q[0]; }
+    if (!hasHan(word)) { if (head && /\p{L}$/u.test(head)) head += ' '; if (tail && /^\p{L}/u.test(tail)) tail = ' ' + tail; }
+    return (head + word + tail).replace(/\s+/g, ' ').trim();
+  }
+  function parseKoreader(db) {
+    const raw = rowsOf(db, `SELECT v.word AS word, v.create_time AS t, v.prev_context AS prev, v.next_context AS next, t.name AS title
+      FROM vocabulary v LEFT JOIN title t ON t.id = v.title_id`);
+    return raw.map(r => {
+      const orig = String(r.word || '').normalize('NFC').trim(), zh = hasHan(orig);
+      const word = zh ? orig.replace(/[^\p{Script=Han}·]/gu, '') : cleanWord(orig);
+      if (!word) return null;
+      const book = shortTitle(r.title) || 'Unknown book';
+      return { word, raw: orig, lang: zh ? 'zh' : 'en', book, chapter: '', context: sentenceAround(r.prev, orig, r.next),
+        date: r.t ? new Date(r.t * 1000).toISOString() : '', key: 'koreader|' + word + '|' + book, source: 'koreader', on: true };
+    }).filter(Boolean).sort((a, b) => String(b.date).localeCompare(String(a.date)));
+  }
+
+  const FRONT_BACK =/^(cover|title page|copyright|dedication|epigraph|(table of )?contents|also by\b|about the (author|publisher)|acknowledge?ments?|notes(\s+\d+)?$|a note (on|about)\b|index$|bibliography|newsletter|praise for\b|credits$|searchable terms)/i;
   function parseContents(db) {
     const titles = new Map(rowsOf(db, `SELECT ContentID AS id, Title AS title FROM content WHERE ContentType = 6`).map(r => [r.id, r.title]));
     const toc = new Map();
@@ -1055,6 +1154,7 @@ nav.tabs button[aria-current="page"] { color: var(--accent) }
         <span class="kw">
           <span class="kword">${esc(it.word)}${it.raw.toLowerCase() !== it.word ? `<span class="kraw">${esc(it.raw)}</span>` : ''}</span>
           <span class="kmeta">${esc(it.book)}${it.chapter ? ' · ' + esc(it.chapter) : ''}${it.date ? ' · ' + esc(fmtDate(it.date)) : ''}</span>
+          ${it.context ? `<span class="kmeta"${it.lang === 'zh' ? ' lang="zh-Hans"' : ''}>${esc(it.context.length > 60 ? it.context.slice(0, 58) + '…' : it.context)}</span>` : ''}
         </span>
       </label>`).join('') || '<div class="loading">Nothing new to import.</div>';
   }
@@ -1073,19 +1173,22 @@ nav.tabs button[aria-current="page"] { color: var(--accent) }
   $('koboBtn').addEventListener('click', () => $('koboFile').click());
   $('koboFile').addEventListener('change', async (e) => {
     const file = e.target.files[0]; e.target.value = ''; if (!file) return;
-    status($('koboStatus'), 'Reading your Kobo file…'); $('koboBtn').disabled = true;
+    const WRONG = "That isn't a Kobo or KOReader word list. Choose KoboReader.sqlite (in .kobo) or vocabulary_builder.sqlite3 (in .adds/koreader/settings).";
+    status($('koboStatus'), 'Reading your file…'); $('koboBtn').disabled = true;
     try {
       const head = new Uint8Array(await file.slice(0, 16).arrayBuffer());
-      if (new TextDecoder().decode(head).indexOf('SQLite format 3') !== 0) {
-        status($('koboStatus'), "That isn't a Kobo database. Choose KoboReader.sqlite from the Kobo's .kobo folder.", true); return;
-      }
+      if (new TextDecoder().decode(head).indexOf('SQLite format 3') !== 0) { status($('koboStatus'), WRONG, true); return; }
       let SQL;
-      try { SQL = await loadSqlJs(); } catch { status($('koboStatus'), "Couldn't load the Kobo reader. Check your connection and try again.", true); return; }
+      try { SQL = await loadSqlJs(); } catch { status($('koboStatus'), "Couldn't load the file reader. Check your connection and try again.", true); return; }
       const db = new SQL.Database(new Uint8Array(await file.arrayBuffer()));
+      let tables = new Set();
+      try { tables = new Set(rowsOf(db, `SELECT name FROM sqlite_master WHERE type = 'table'`).map(r => r.name)); } catch {}
+      const src = tables.has('vocabulary') && tables.has('title') ? 'koreader' : tables.has('WordList') ? 'kobo' : '';
+      if (!src) { status($('koboStatus'), WRONG, true); db.close(); return; }
       let all;
-      try { all = parseKobo(db); } catch { status($('koboStatus'), "This file has no My Words list. Choose KoboReader.sqlite from the Kobo's .kobo folder.", true); db.close(); return; }
+      try { all = src === 'koreader' ? parseKoreader(db) : parseKobo(db); } catch { status($('koboStatus'), WRONG, true); db.close(); return; }
       let contents = [];
-      try { contents = parseContents(db); } catch {}
+      if (src === 'kobo') { try { contents = parseContents(db); } catch {} }
       db.close();
       const cs = await saveContents(contents);
       const haveWords = new Set(words.map(w => (w.word || '').toLowerCase()));
@@ -1093,13 +1196,15 @@ nav.tabs button[aria-current="page"] { color: var(--accent) }
       koboItems = all.filter(i => !haveWords.has(i.word) && !haveKeys.has(i.key));
       const skipped = all.length - koboItems.length;
       koboDone = false; koboBusy = false;
-      $('koboSub').textContent = `From ${all.length} word${all.length === 1 ? '' : 's'} in My Words` + (skipped ? ` · ${skipped} already in your library, hidden` : '') +
+      $('koboTitle').textContent = src === 'koreader' ? 'Import from KOReader' : 'Import from Kobo';
+      $('koboBase').closest('label').hidden = !koboItems.some(i => i.lang === 'en');
+      $('koboSub').textContent = `From ${all.length} word${all.length === 1 ? '' : 's'} in ${src === 'koreader' ? 'Vocabulary builder' : 'My Words'}` + (skipped ? ` · ${skipped} already in your library, hidden` : '') +
         (cs.saved ? ` · Chapters saved for ${cs.saved} book${cs.saved === 1 ? '' : 's'}` : '') + (cs.fixed ? ` · ${cs.fixed} chapter${cs.fixed === 1 ? '' : 's'} tidied` : '');
       status($('koboProgress')); status($('koboStatus'));
       renderKobo();
       close('settingsSheet'); open('koboSheet');
     } catch {
-      status($('koboStatus'), "Couldn't read that file. Make sure it's KoboReader.sqlite and try again.", true);
+      status($('koboStatus'), "Couldn't read that file. Make sure it's KoboReader.sqlite or vocabulary_builder.sqlite3 and try again.", true);
     } finally { $('koboBtn').disabled = false; }
   });
 
@@ -1110,25 +1215,36 @@ nav.tabs button[aria-current="page"] { color: var(--accent) }
     koboBusy = true; renderKobo();
     const taken = new Set(words.map(w => (w.word || '').toLowerCase()));
     let saved = 0, undefinedN = 0, dupes = 0, failed = 0;
+    const localZh = it => it.lang === 'zh' && !USE_CLAUDE_ZH;
+    let dict = null;
+    if (chosen.some(localZh)) {
+      status($('koboProgress'), 'Loading the Chinese dictionary…');
+      try { dict = await loadCedict(); } catch {}
+    }
     for (let i = 0; i < chosen.length; i += 10) {
       const batch = chosen.slice(i, i + 10);
       status($('koboProgress'), `Defining and saving… ${Math.min(i + batch.length, chosen.length)} of ${chosen.length}`);
-      let results = [];
-      try {
-        const { data, error } = await sb.functions.invoke('define', { body: { items: batch.map(b => ({ word: b.word, book: b.book })) } });
-        if (!error && data && Array.isArray(data.results)) results = data.results;
-      } catch {}
+      const results = batch.map(it => localZh(it) && dict ? cedictEntry(dict, it.word) : null);
+      const remote = batch.map((it, j) => j).filter(j => !localZh(batch[j]));
+      if (remote.length) {
+        try {
+          const { data, error } = await sb.functions.invoke('define', { body: { items: remote.map(j => ({ word: batch[j].word, book: batch[j].book })) } });
+          if (!error && data && Array.isArray(data.results)) remote.forEach((j, n) => { results[j] = data.results[n] || null; });
+        } catch {}
+      }
       const rows = [];
       batch.forEach((it, j) => {
         const r = results[j] && results[j].definition ? results[j] : null;
-        const w0 = (useBase && r && r.word ? String(r.word) : it.word).trim(), w = it.lang === 'zh' ? w0 : w0.toLowerCase();
+        const w0 = ((useBase || it.lang === 'zh') && r && r.word ? String(r.word) : it.word).trim(), w = it.lang === 'zh' ? w0 : w0.toLowerCase();
         if (taken.has(w)) { dupes++; return; }
         taken.add(w);
         if (!r) undefinedN++;
+        const ctx = it.context || r?.example || '';
         rows.push({
-          ...toRow({ word: w, partOfSpeech: r?.partOfSpeech, phonetic: r?.phonetic, definition: r?.definition, context: r?.example, lang: it.lang, definitionZh: r?.definitionZh, contextTranslation: r?.exampleTranslation, chars: r?.chars,
-            bookTitle: it.book, pageNumber: it.chapter, tags: ['kobo'], status: 'LEARNING', audioUrl: r?.audioUrl }),
-          source: 'kobo', kobo_key: it.key, created_at: new Date(Date.parse(it.date) || Date.now()).toISOString()
+          ...toRow({ word: w, partOfSpeech: r?.partOfSpeech, phonetic: r?.phonetic, definition: r?.definition, context: ctx, lang: it.lang, definitionZh: r?.definitionZh,
+            contextTranslation: it.context ? r?.contextTranslation : r?.exampleTranslation, chars: r?.chars,
+            bookTitle: it.book, pageNumber: it.chapter, tags: [it.source || 'kobo'], status: 'LEARNING', audioUrl: r?.audioUrl }),
+          source: it.source || 'kobo', kobo_key: it.key, created_at: new Date(Date.parse(it.date) || Date.now()).toISOString()
         });
       });
       if (!rows.length) continue;
