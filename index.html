@@ -15,7 +15,7 @@
 <link rel="manifest" href="manifest.json">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Literata:opsz,wght@7..72,400&family=Playfair+Display:ital,wght@0,600;0,700;1,400&display=swap" rel="stylesheet">
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Literata:opsz,wght@7..72,400&family=Noto+Serif+SC:wght@500;700&family=Playfair+Display:ital,wght@0,600;0,700;1,400&display=swap" rel="stylesheet">
 <style>
 [hidden] { display: none !important }
 img { max-width: 100% }
@@ -28,6 +28,7 @@ img { max-width: 100% }
   --serif: "Playfair Display", Georgia, "Times New Roman", serif;
   --sans: "Inter", -apple-system, "Segoe UI", Roboto, sans-serif;
   --quote: "Literata", Georgia, "Times New Roman", serif;
+  --zh: "Noto Serif SC", "Songti SC", "STSong", "SimSun", serif;
   --mono: ui-monospace, "SF Mono", Menlo, monospace;
 }
 @media (prefers-color-scheme: dark) { :root:not([data-theme="light"]) {
@@ -122,6 +123,21 @@ main { padding-block: 1rem 1.5rem; padding-left: max(16px, env(safe-area-inset-l
 .def { margin: 0; font-size: .85rem; line-height: 1.5; white-space: pre-line }
 .field-head { display: flex; justify-content: space-between; align-items: center; gap: .5rem }
 #exampleStatus:empty { display: none }
+.seg { display: flex; gap: .2rem; background: var(--bg); border: 1px solid var(--line); border-radius: .8rem; padding: .2rem }
+.seg button { flex: 1; border: 0; background: transparent; border-radius: .6rem; padding: .4rem; font-size: .8rem; font-weight: 500; color: var(--muted) }
+.seg button[aria-pressed="true"] { background: var(--card); color: var(--accent); box-shadow: 0 0 0 1px var(--line) }
+.seg .cnt { font-weight: 400; opacity: .75; margin-left: .2rem; font-variant-numeric: tabular-nums }
+.word h3.zh, .front h2.zh, .back-head strong.zh { font-family: var(--zh); text-transform: none; letter-spacing: .02em }
+.phon.py { font-family: var(--sans); font-size: .78rem }
+.def-zh { margin: 0; font-family: var(--zh); font-weight: 500; font-size: .85rem; line-height: 1.6 }
+.chars { display: flex; flex-wrap: wrap; gap: .3rem }
+.chars span { font-size: .7rem; color: var(--muted); background: var(--bg); border-radius: .4rem; padding: .1rem .45rem }
+.chars b { font-family: var(--zh); font-weight: 500; color: var(--fg); margin-right: .25rem; font-size: .8rem }
+.ctx.zh { font-family: var(--zh); font-weight: 500; color: var(--fg) }
+.ctx .ctx-tr { display: block; margin-top: .2rem; font-family: var(--quote); font-weight: 400; color: var(--muted); font-size: .78rem }
+.zh-only { display: none !important }
+#wordForm.is-zh .zh-only { display: flex !important }
+#wordForm.is-zh #fWordIn, #wordForm.is-zh #fCtxIn, #fDefZhIn { font-family: var(--zh) }
 .btn-xs { padding: .2rem .55rem; font-size: .7rem; border-radius: .55rem }
 .ctx { margin: 0; white-space: pre-line; font-family: var(--quote); font-style: normal; font-size: .85rem; line-height: 1.5; color: var(--muted); background: var(--surface); border-left: 2px solid var(--accent); border-radius: 0 .5rem .5rem 0; padding: .3rem .6rem .3rem .7rem }
 .foot { display: flex; justify-content: space-between; align-items: center; gap: .5rem; flex-wrap: wrap; border-top: 1px solid var(--line); padding-top: .45rem; font-size: .68rem; font-weight: 500; color: var(--muted) }
@@ -234,6 +250,7 @@ nav.tabs button[aria-current="page"] { color: var(--accent) }
 
   <main>
     <div id="banner" class="banner" hidden></div>
+    <div class="seg" id="langSeg" role="group" aria-label="Language" hidden><button type="button" data-l="en" aria-pressed="true">English<span class="cnt" id="cntEn"></span></button><button type="button" data-l="zh" aria-pressed="false">中文<span class="cnt" id="cntZh"></span></button></div>
 
     <section id="authView" class="auth" hidden>
       <h2 id="authTitle">Sign in to your library</h2>
@@ -294,7 +311,7 @@ nav.tabs button[aria-current="page"] { color: var(--accent) }
               <div><strong id="bWord"></strong> <span class="pos" id="bPos"></span></div>
               <button class="iconbtn" id="speakBtn" aria-label="Pronounce"><svg class="i"><use href="#i-speaker"/></svg></button>
             </div>
-            <div><p class="label">Definition</p><p class="def" id="bDef"></p></div>
+            <div><p class="label">Definition</p><p class="def" id="bDef"></p><p class="def-zh" id="bDefZh" hidden></p></div>
             <div id="bCtxWrap"><p class="label">Example</p><p class="ctx" id="bCtx"></p></div>
           </div>
         </div>
@@ -324,10 +341,13 @@ nav.tabs button[aria-current="page"] { color: var(--accent) }
       <div class="suggest" id="suggest" hidden></div>
       <div class="grid2">
         <div class="field"><label for="fPosIn">Part of speech</label><input id="fPosIn" placeholder="noun, verb…"></div>
-        <div class="field"><label for="fPhonIn">Pronunciation</label><input id="fPhonIn" placeholder="/ˈwɜːd/"></div>
+        <div class="field"><label for="fPhonIn" id="fPhonLbl">Pronunciation</label><input id="fPhonIn" placeholder="/ˈwɜːd/"></div>
       </div>
       <div class="field"><label for="fDefIn">Definition</label><textarea id="fDefIn" rows="4" placeholder="Fills in automatically, or write your own"></textarea></div>
+      <div class="field zh-only"><label for="fDefZhIn">Chinese definition</label><textarea id="fDefZhIn" rows="2" placeholder="中文释义"></textarea></div>
+      <div class="field zh-only"><label>Characters</label><div class="chars" id="charsPreview"></div><input type="hidden" id="fCharsIn"></div>
       <div class="field"><div class="field-head"><label for="fCtxIn">Example sentence</label><button type="button" class="btn btn-soft btn-xs" id="exampleBtn">Suggest</button></div><textarea id="fCtxIn" rows="2" class="serif" placeholder="The line you read it in, or tap Suggest"></textarea><div class="status-line" id="exampleStatus"></div></div>
+      <div class="field zh-only"><label for="fCtxTrIn">Translation</label><textarea id="fCtxTrIn" rows="2" placeholder="English translation of the sentence"></textarea></div>
       <div class="grid3">
         <div class="field"><label for="fBookIn">Book</label><input id="fBookIn" list="bookList" placeholder="e.g. Middlemarch"><datalist id="bookList"></datalist></div>
         <div class="field"><label for="fPageIn">Chapter / page</label><input id="fPageIn" list="chapterList" placeholder="Ch. 3" autocomplete="off"><datalist id="chapterList"></datalist></div>
@@ -407,7 +427,7 @@ nav.tabs button[aria-current="page"] { color: var(--accent) }
 <script>
 /* Self-update: compare this page's version with version.json (never cached) and reload once if newer. */
 (() => {
-  const APP_VERSION = '8';
+  const APP_VERSION = '9';
   async function check() {
     try {
       const r = await fetch('version.json?t=' + Date.now(), { cache: 'no-store' });
@@ -435,6 +455,8 @@ nav.tabs button[aria-current="page"] { color: var(--accent) }
 
   const $ = (id) => document.getElementById(id);
   let words = [], editId = null, sortAsc = false, queue = [], qi = 0, user = null, lastBook = '';
+  const hasHan = s => /\p{Script=Han}/u.test(String(s || ''));
+  let curLang = 'en'; try { if (localStorage.getItem('marginalia_lang') === 'zh') curLang = 'zh'; } catch {}
   let books = new Map(); // lowercased title -> { title, chapters: ['Ch. 1: …', …] }
 
   // ---------- helpers ----------
@@ -449,10 +471,10 @@ nav.tabs button[aria-current="page"] { color: var(--accent) }
   // DB row <-> app object
   const fromRow = r => ({ id: r.id, word: r.word, partOfSpeech: r.part_of_speech, phonetic: r.phonetic, definition: r.definition,
     context: r.context, bookTitle: r.book_title, pageNumber: r.page_number, tags: r.tags || [], status: r.status,
-    audioUrl: r.audio_url, createdAt: Date.parse(r.created_at), source: r.source || 'manual', koboKey: r.kobo_key || null });
+    audioUrl: r.audio_url, createdAt: Date.parse(r.created_at), source: r.source || 'manual', koboKey: r.kobo_key || null, lang: r.lang || 'en', definitionZh: r.definition_zh || '', contextTranslation: r.context_translation || '', chars: Array.isArray(r.chars) ? r.chars : [] });
   const toRow = w => ({ word: w.word, part_of_speech: w.partOfSpeech || '', phonetic: w.phonetic || '', definition: w.definition || '',
     context: w.context || '', book_title: w.bookTitle || '', page_number: w.pageNumber || '', tags: w.tags || [],
-    status: w.status === 'MASTERED' ? 'MASTERED' : 'LEARNING', audio_url: w.audioUrl || '' });
+    status: w.status === 'MASTERED' ? 'MASTERED' : 'LEARNING', audio_url: w.audioUrl || '', lang: w.lang === 'zh' ? 'zh' : 'en', definition_zh: w.definitionZh || '', context_translation: w.contextTranslation || '', chars: w.chars || [] });
 
   // ---------- theme ----------
   const root = document.documentElement;
@@ -471,11 +493,11 @@ nav.tabs button[aria-current="page"] { color: var(--accent) }
   let signUpMode = false;
   function showAuth() {
     $('authView').hidden = false; $('libraryView').hidden = true; $('reviewView').hidden = true;
-    $('tabs').hidden = true; $('openSettings').hidden = true;
+    $('tabs').hidden = true; $('openSettings').hidden = true; $('langSeg').hidden = true;
   }
   function showApp() {
     $('authView').hidden = true; $('libraryView').hidden = false; $('reviewView').hidden = true;
-    $('tabs').hidden = false; $('openSettings').hidden = false;
+    $('tabs').hidden = false; $('openSettings').hidden = false; $('langSeg').hidden = false;
     $('acctEmail').textContent = 'Signed in as ' + (user?.email || '');
   }
   $('authToggle').addEventListener('click', () => {
@@ -550,18 +572,36 @@ nav.tabs button[aria-current="page"] { color: var(--accent) }
   $('fPageIn').addEventListener('change', () => { $('fPageIn').value = expandChapter($('fBookIn').value, $('fPageIn').value); });
   document.addEventListener('visibilitychange', () => { if (!document.hidden && user) loadWords(); });
 
+  // ---------- language switch ----------
+  function syncLangSeg() {
+    const nZh = words.filter(w => w.lang === 'zh').length, nEn = words.length - nZh;
+    $('cntEn').textContent = ' · ' + nEn; $('cntZh').textContent = ' · ' + nZh;
+    document.querySelectorAll('#langSeg button').forEach(b => b.setAttribute('aria-pressed', String(b.dataset.l === curLang)));
+  }
+  function setLang(l) {
+    if (l === curLang) return;
+    curLang = l; try { localStorage.setItem('marginalia_lang', l); } catch {}
+    $('bookFilter').value = 'ALL';
+    renderLibrary();
+    if (!$('reviewView').hidden) startReview();
+  }
+  $('langSeg').addEventListener('click', e => { const b = e.target.closest('[data-l]'); if (b) setLang(b.dataset.l); });
+
   // ---------- library ----------
+  const inLang = w => (w.lang || 'en') === curLang;
+  const flat = s => String(s || '').normalize('NFD').replace(/[\u0300-\u036f]/g, '').replace(/[\s'’-]+/g, '').toLowerCase();
   function filtered() {
-    const q = $('searchInput').value.toLowerCase().trim();
+    const q = $('searchInput').value.toLowerCase().trim(), fq = flat(q);
     const book = $('bookFilter').value, st = $('statusFilter').value;
-    return words.filter(w =>
-      (!q || [w.word, w.definition, w.context].some(x => (x || '').toLowerCase().includes(q))) &&
+    return words.filter(w => inLang(w) &&
+      (!q || [w.word, w.definition, w.context, w.definitionZh, w.contextTranslation].some(x => (x || '').toLowerCase().includes(q)) ||
+        (w.lang === 'zh' && fq && flat(w.phonetic).includes(fq))) &&
       (book === 'ALL' || w.bookTitle === book) &&
       (st === 'ALL' || w.status === st)
     ).sort((a, b) => sortAsc ? a.createdAt - b.createdAt : b.createdAt - a.createdAt);
   }
   function renderBooks() {
-    const books = [...new Set(words.map(w => w.bookTitle).filter(Boolean))].sort();
+    const books = [...new Set(words.filter(inLang).map(w => w.bookTitle).filter(Boolean))].sort();
     const sel = $('bookFilter'), cur = sel.value;
     sel.innerHTML = '<option value="ALL">All Books</option>' + books.map(b => `<option value="${esc(b)}">${esc(b)}</option>`).join('');
     sel.value = books.includes(cur) ? cur : 'ALL';
@@ -570,15 +610,17 @@ nav.tabs button[aria-current="page"] { color: var(--accent) }
   function renderLibrary() {
     renderBooks();
     const list = filtered();
+    syncLangSeg();
     $('counter').textContent = `${list.length} word${list.length === 1 ? '' : 's'} recorded`;
     $('empty').hidden = words.length !== 0;
-    if (!list.length) { $('list').innerHTML = words.length ? '<div class="loading">No words match these filters.</div>' : ''; return; }
+    const nLang = words.filter(inLang).length;
+    if (!list.length) { $('list').innerHTML = !words.length ? '' : !nLang ? (curLang === 'zh' ? '<div class="loading">No Chinese words yet. Type a word in Chinese characters above to add one.</div>' : '<div class="loading">No English words yet.</div>') : '<div class="loading">No words match these filters.</div>'; return; }
     $('list').innerHTML = list.map(w => `
       <article class="word">
         <div class="word-top">
           <div style="min-width:0">
-            <div class="word-name"><h3>${esc(w.word)}</h3>${w.partOfSpeech ? `<span class="pos">${esc(w.partOfSpeech)}</span>` : ''}<button class="saybtn" data-say="${esc(w.id)}" aria-label="Pronounce ${esc(w.word)}"><svg class="i"><use href="#i-speaker"/></svg></button></div>
-            ${w.phonetic ? `<div class="phon">${esc(w.phonetic)}</div>` : ''}
+            <div class="word-name"><h3${w.lang === 'zh' ? ' class="zh" lang="zh-Hans"' : ''}>${esc(w.word)}</h3>${w.partOfSpeech ? `<span class="pos">${esc(w.partOfSpeech)}</span>` : ''}<button class="saybtn" data-say="${esc(w.id)}" aria-label="Pronounce ${esc(w.word)}"><svg class="i"><use href="#i-speaker"/></svg></button></div>
+            ${w.phonetic ? `<div class="phon${w.lang === 'zh' ? ' py' : ''}">${esc(w.phonetic)}</div>` : ''}
           </div>
           <div class="actions">
             <span class="pill ${w.status === 'MASTERED' ? 'MASTERED' : 'LEARNING'}">${w.status === 'MASTERED' ? 'Mastered' : 'Learning'}</span>
@@ -588,7 +630,11 @@ nav.tabs button[aria-current="page"] { color: var(--accent) }
         </div>
         <span class="confirm" data-confirm="${esc(w.id)}" hidden>Delete this word? <button class="btn btn-learning" data-yes="${esc(w.id)}">Delete</button><button class="linkbtn" data-no="${esc(w.id)}">Keep</button></span>
         ${w.definition ? `<p class="def">${esc(w.definition)}</p>` : ''}
-        ${w.context ? `<p class="ctx">"${esc(w.context)}"</p>` : ''}
+        ${w.lang === 'zh' && w.definitionZh ? `<p class="def-zh" lang="zh-Hans">${esc(w.definitionZh)}</p>` : ''}
+        ${w.lang === 'zh' && (w.chars || []).length ? `<div class="chars">${w.chars.map(c => `<span><b lang="zh-Hans">${esc(c.c)}</b>${esc(c.m)}</span>`).join('')}</div>` : ''}
+        ${w.context ? (w.lang === 'zh'
+          ? `<p class="ctx zh" lang="zh-Hans">${esc(w.context)}${w.contextTranslation ? `<span class="ctx-tr" lang="en">${esc(w.contextTranslation)}</span>` : ''}</p>`
+          : `<p class="ctx">"${esc(w.context)}"</p>`) : ''}
         <div class="foot">
           <span>${w.bookTitle ? esc(w.bookTitle) + (w.pageNumber ? ' (' + esc(w.pageNumber) + ')' : '') : 'Standalone word'}</span>
           ${(w.tags || []).length ? `<span class="tags">${w.tags.map(t => `<span class="tag">#${esc(t)}</span>`).join('')}</span>` : ''}
@@ -612,15 +658,16 @@ nav.tabs button[aria-current="page"] { color: var(--accent) }
   $('sortBtn').addEventListener('click', () => { sortAsc = !sortAsc; $('sortBtn').textContent = 'Sort: ' + (sortAsc ? 'Oldest' : 'Newest') + ' ⇅'; renderLibrary(); });
 
   // ---------- add / edit ----------
-  const F = { word: 'fWordIn', partOfSpeech: 'fPosIn', phonetic: 'fPhonIn', definition: 'fDefIn', context: 'fCtxIn', bookTitle: 'fBookIn', pageNumber: 'fPageIn', status: 'fStatusIn', audioUrl: 'fAudioIn' };
+  const F = { word: 'fWordIn', partOfSpeech: 'fPosIn', phonetic: 'fPhonIn', definition: 'fDefIn', definitionZh: 'fDefZhIn', contextTranslation: 'fCtxTrIn', context: 'fCtxIn', bookTitle: 'fBookIn', pageNumber: 'fPageIn', status: 'fStatusIn', audioUrl: 'fAudioIn' };
   function resetSheet() { status($('defineStatus')); status($('saveStatus')); status($('exampleStatus')); $('suggest').hidden = true; $('suggest').innerHTML = ''; }
   function openAdd(word = '', ctx = '') {
     editId = null; $('sheetTitle').textContent = 'Add word';
     $('wordForm').reset(); $('fAudioIn').value = '';
-    const recent = words.slice().sort((a, b) => b.createdAt - a.createdAt)[0];
-    const book = lastBook || recent?.bookTitle || '';
+    const recent = words.filter(x => (x.lang || 'en') === (hasHan(word) ? 'zh' : curLang)).sort((a, b) => b.createdAt - a.createdAt)[0];
+    const book = (lastBook && words.some(x => x.bookTitle === lastBook && (x.lang || 'en') === (recent?.lang || curLang)) ? lastBook : '') || recent?.bookTitle || '';
     $('fWordIn').value = word; $('fCtxIn').value = ctx; $('fBookIn').value = book;
     $('fPageIn').value = lastChapterFor(book); fillChapterList();
+    $('fCharsIn').value = ''; updateFormLang();
     resetSheet(); open('wordSheet');
     if (word) define();
   }
@@ -629,10 +676,25 @@ nav.tabs button[aria-current="page"] { color: var(--accent) }
     editId = id; $('sheetTitle').textContent = 'Edit word';
     for (const [k, el] of Object.entries(F)) $(el).value = w[k] || (k === 'status' ? 'LEARNING' : '');
     $('fTagsIn').value = (w.tags || []).join(', ');
+    $('fCharsIn').value = JSON.stringify(w.chars || []); updateFormLang();
     fillChapterList();
     resetSheet(); open('wordSheet');
   }
   $('quickForm').addEventListener('submit', (e) => { e.preventDefault(); const w = $('quickInput').value.trim(); if (w) openAdd(w); });
+
+  function renderCharsPreview() {
+    let list = []; try { list = JSON.parse($('fCharsIn').value || '[]'); } catch {}
+    $('charsPreview').innerHTML = list.length ? list.map(c => `<span><b lang="zh-Hans">${esc(c.c)}</b>${esc(c.m)}</span>`).join('') : '<span>Fills in when you tap Define</span>';
+  }
+  function updateFormLang() {
+    const zh = hasHan($('fWordIn').value);
+    $('wordForm').classList.toggle('is-zh', zh);
+    $('fPhonLbl').textContent = zh ? 'Pinyin' : 'Pronunciation';
+    $('fPhonIn').placeholder = zh ? 'wòxuán' : '/ˈwɜːd/';
+    $('fCtxIn').placeholder = zh ? '书中的原句，或点 Suggest' : 'The line you read it in, or tap Suggest';
+    renderCharsPreview();
+  }
+  $('fWordIn').addEventListener('input', updateFormLang);
 
   let lookupSeq = 0;
   async function define() {
@@ -650,7 +712,11 @@ nav.tabs button[aria-current="page"] { color: var(--accent) }
         if (body.word && body.word.toLowerCase() !== word.toLowerCase()) $('fWordIn').value = body.word;
         $('fPosIn').value = body.partOfSpeech || ''; $('fPhonIn').value = body.phonetic || '';
         $('fDefIn').value = body.definition; $('fAudioIn').value = body.audioUrl || '';
-        if (body.example && !$('fCtxIn').value.trim()) $('fCtxIn').value = body.example;
+        const hadCtx = !!$('fCtxIn').value.trim();
+        if (body.example && !hadCtx) { $('fCtxIn').value = body.example; $('fCtxTrIn').value = body.exampleTranslation || ''; }
+        else if (hadCtx && body.contextTranslation && !$('fCtxTrIn').value.trim()) $('fCtxTrIn').value = body.contextTranslation;
+        if (body.lang === 'zh') { $('fDefZhIn').value = body.definitionZh || ''; $('fCharsIn').value = JSON.stringify(body.chars || []); }
+        updateFormLang();
         status($('defineStatus'), 'From ' + (body.source || 'the dictionary') + '. Edit anything before saving.');
       } else if (body && body.suggestions && body.suggestions.length) {
         status($('defineStatus'), 'Not found. Did you mean:', true);
@@ -667,7 +733,9 @@ nav.tabs button[aria-current="page"] { color: var(--accent) }
   $('wordForm').addEventListener('submit', async (e) => {
     e.preventDefault();
     const w = {
-      word: $('fWordIn').value.trim().toLowerCase(), partOfSpeech: $('fPosIn').value.trim(), phonetic: $('fPhonIn').value.trim(),
+      word: hasHan($('fWordIn').value) ? $('fWordIn').value.trim() : $('fWordIn').value.trim().toLowerCase(), partOfSpeech: $('fPosIn').value.trim(), phonetic: $('fPhonIn').value.trim(),
+      lang: hasHan($('fWordIn').value) ? 'zh' : 'en', definitionZh: $('fDefZhIn').value.trim(), contextTranslation: $('fCtxTrIn').value.trim(),
+      chars: (() => { try { return hasHan($('fWordIn').value) ? JSON.parse($('fCharsIn').value || '[]') : []; } catch { return []; } })(),
       definition: $('fDefIn').value.trim(), context: $('fCtxIn').value.trim(), bookTitle: $('fBookIn').value.trim(),
       pageNumber: expandChapter($('fBookIn').value, $('fPageIn').value), tags: $('fTagsIn').value.split(',').map(t => t.trim()).filter(Boolean),
       status: $('fStatusIn').value, audioUrl: $('fAudioIn').value
@@ -682,7 +750,8 @@ nav.tabs button[aria-current="page"] { color: var(--accent) }
     const saved = fromRow(data);
     words = editId ? words.map(x => x.id === editId ? saved : x) : [saved, ...words];
     lastBook = w.bookTitle;
-    close('wordSheet'); $('quickInput').value = ''; renderLibrary();
+    close('wordSheet'); $('quickInput').value = '';
+    if (w.lang !== curLang) setLang(w.lang); else renderLibrary();
   });
 
   $('seedBtn').addEventListener('click', async () => {
@@ -731,8 +800,9 @@ nav.tabs button[aria-current="page"] { color: var(--accent) }
 
   // ---------- flashcards ----------
   function startReview() {
-    const learning = words.filter(w => w.status !== 'MASTERED');
-    queue = (learning.length ? learning : words.slice()).map(w => w.id);
+    const pool = words.filter(inLang);
+    const learning = pool.filter(w => w.status !== 'MASTERED');
+    queue = (learning.length ? learning : pool).map(w => w.id);
     for (let i = queue.length - 1; i > 0; i--) { const j = Math.floor(Math.random() * (i + 1)); [queue[i], queue[j]] = [queue[j], queue[i]]; }
     $('reviewLabel').textContent = learning.length ? 'Learning words' : 'Everything is mastered, reviewing all';
     qi = 0; renderCard();
@@ -742,18 +812,24 @@ nav.tabs button[aria-current="page"] { color: var(--accent) }
     const w = words.find(x => x.id === queue[qi]);
     $('learningBtn').disabled = $('masteredBtn').disabled = !w;
     if (!w) {
-      $('fWord').textContent = words.length ? 'Done for now' : 'No cards yet';
+      $('fWord').textContent = words.filter(inLang).length ? 'Done for now' : 'No cards yet'; $('fWord').classList.remove('zh');
       $('fPhon').textContent = ''; $('fBook').textContent = ''; $('fStatus').textContent = ''; $('fStatus').className = 'pill';
       $('reviewCount').textContent = '0 / 0'; $('bar').style.width = '0%'; return;
     }
     $('reviewCount').textContent = `${qi + 1} / ${queue.length}`;
     $('bar').style.width = ((qi + 1) / queue.length * 100) + '%';
-    $('fWord').textContent = w.word; $('fPhon').textContent = w.phonetic || ''; $('fBook').textContent = w.bookTitle || '';
+    const zh = w.lang === 'zh';
+    $('fWord').textContent = w.word; $('fWord').classList.toggle('zh', zh); $('bWord').classList.toggle('zh', zh);
+    $('fPhon').textContent = w.phonetic || ''; $('fPhon').classList.toggle('py', zh); $('fBook').textContent = w.bookTitle || '';
     $('fStatus').textContent = w.status === 'MASTERED' ? 'Mastered' : 'Learning';
     $('fStatus').className = 'pill ' + (w.status === 'MASTERED' ? 'MASTERED' : 'LEARNING');
-    $('bWord').textContent = w.word; $('bPos').textContent = w.partOfSpeech || ''; $('bPos').hidden = !w.partOfSpeech;
+    $('bWord').textContent = w.word;
+    const posTxt = [zh ? w.phonetic : '', w.partOfSpeech].filter(Boolean).join(' · ');
+    $('bPos').textContent = posTxt; $('bPos').hidden = !posTxt;
     $('bDef').textContent = w.definition || 'No definition saved.';
-    $('bCtxWrap').hidden = !w.context; $('bCtx').textContent = w.context ? '"' + w.context + '"' : '';
+    $('bDefZh').hidden = !(zh && w.definitionZh); $('bDefZh').textContent = zh ? w.definitionZh || '' : '';
+    $('bCtxWrap').hidden = !w.context; $('bCtx').classList.toggle('zh', zh);
+    $('bCtx').innerHTML = !w.context ? '' : zh ? esc(w.context) + (w.contextTranslation ? `<span class="ctx-tr">${esc(w.contextTranslation)}</span>` : '') : esc('"' + w.context + '"');
   }
   async function mark(st) {
     const id = queue[qi]; if (!id) return;
@@ -777,8 +853,9 @@ nav.tabs button[aria-current="page"] { color: var(--accent) }
   });
   function speak(w) {
     if (!w) return;
-    const say = () => { if ('speechSynthesis' in window) { const u = new SpeechSynthesisUtterance(w.word); u.lang = 'en-US'; speechSynthesis.cancel(); speechSynthesis.speak(u); } };
-    if (w.audioUrl) new Audio(w.audioUrl).play().catch(say); else say();
+    const zh = w.lang === 'zh' || hasHan(w.word);
+    const say = () => { if ('speechSynthesis' in window) { const u = new SpeechSynthesisUtterance(w.word); u.lang = zh ? 'zh-CN' : 'en-US'; speechSynthesis.cancel(); speechSynthesis.speak(u); } };
+    if (w.audioUrl && !zh) new Audio(w.audioUrl).play().catch(say); else say();
   }
 
   // ---------- tabs ----------
@@ -802,7 +879,7 @@ nav.tabs button[aria-current="page"] { color: var(--accent) }
   }
   $('exportJson').addEventListener('click', () => download(`marginalia_${stamp()}.json`, JSON.stringify(words, null, 2), 'application/json'));
   $('exportCsv').addEventListener('click', () => {
-    const cols = ['word', 'partOfSpeech', 'phonetic', 'definition', 'context', 'bookTitle', 'pageNumber', 'status', 'tags'];
+    const cols = ['word', 'lang', 'partOfSpeech', 'phonetic', 'definition', 'definitionZh', 'context', 'contextTranslation', 'bookTitle', 'pageNumber', 'status', 'tags'];
     const q = v => '"' + String(Array.isArray(v) ? v.join(';') : (v ?? '')).replace(/"/g, '""') + '"';
     download(`marginalia_${stamp()}.csv`, [cols.join(','), ...words.map(w => cols.map(c => q(w[c])).join(','))].join('\n'), 'text/csv');
   });
@@ -835,7 +912,7 @@ nav.tabs button[aria-current="page"] { color: var(--accent) }
     $('exampleBtn').disabled = true; status($('exampleStatus'), 'Writing an example…');
     try {
       const [r] = await fetchExamples([{ word, definition: $('fDefIn').value.trim(), context: '', book: $('fBookIn').value.trim() }]);
-      if (r && r.example) { $('fCtxIn').value = r.example; status($('exampleStatus')); }
+      if (r && r.example) { $('fCtxIn').value = r.example; $('fCtxTrIn').value = r.translation || ''; status($('exampleStatus')); }
       else status($('exampleStatus'), "Couldn't write an example for this word. Type your own.", true);
     } catch { status($('exampleStatus'), "Couldn't reach Claude. Check your connection and try again.", true); }
     finally { $('exampleBtn').disabled = false; }
@@ -857,10 +934,11 @@ nav.tabs button[aria-current="page"] { color: var(--accent) }
       let results = [];
       try { results = await fetchExamples(batch.map(w => ({ word: w.word, definition: w.definition, context: '', book: w.bookTitle }))); } catch {}
       await Promise.all(batch.map(async (w, j) => {
-        const ex = results[j] && results[j].example;
+        const ex = results[j] && results[j].example, tr = (results[j] && results[j].translation) || '';
         if (!ex) { failed++; return; }
-        const { error } = await sb.from('words').update({ context: ex }).eq('id', w.id);
-        if (error) failed++; else { w.context = ex; done++; }
+        const patch = w.lang === 'zh' ? { context: ex, context_translation: tr } : { context: ex };
+        const { error } = await sb.from('words').update(patch).eq('id', w.id);
+        if (error) failed++; else { w.context = ex; if (w.lang === 'zh') w.contextTranslation = tr; done++; }
       }));
     }
     status($('addExamplesStatus'), `Added sentences to ${done} word${done === 1 ? '' : 's'}.` + (failed ? ` ${failed} couldn't be done; tap the button to retry them.` : ''), !!failed);
@@ -899,7 +977,7 @@ nav.tabs button[aria-current="page"] { color: var(--accent) }
     return values.map(v => Object.fromEntries(columns.map((c, i) => [c, v[i]])));
   }
   function parseKobo(db) {
-    const raw = rowsOf(db, `SELECT w.Text AS text, w.VolumeId AS vol, w.DateCreated AS date,
+    const raw = rowsOf(db, `SELECT w.Text AS text, w.VolumeId AS vol, w.DateCreated AS date, w.DictSuffix AS dict,
         (SELECT c.Title FROM content c WHERE c.ContentID = w.VolumeId ORDER BY (c.ContentType = 6) DESC LIMIT 1) AS title
       FROM WordList w`);
     let hls = [];
@@ -920,7 +998,7 @@ nav.tabs button[aria-current="page"] { color: var(--accent) }
       const hits = hls.filter(h => h.vol === r.vol && re.test(String(h.text).toLowerCase()))
         .sort((a, b) => Math.abs((Date.parse(a.date) || 0) - t) - Math.abs((Date.parse(b.date) || 0) - t));
       return {
-        word: r.word, raw: String(r.text).trim(), vol: r.vol,
+        word: r.word, raw: String(r.text).trim(), vol: r.vol, lang: hasHan(r.word) || /zh/i.test(String(r.dict || '')) ? 'zh' : 'en',
         book: (r.title || bookFromVolume(r.vol) || 'Unknown book').trim(),
         chapter: hits.length ? chapterLabel(hits[0].chapter) : '',
         date: r.date, key: r.word + '|' + r.vol, on: true
@@ -1043,12 +1121,12 @@ nav.tabs button[aria-current="page"] { color: var(--accent) }
       const rows = [];
       batch.forEach((it, j) => {
         const r = results[j] && results[j].definition ? results[j] : null;
-        const w = (useBase && r && r.word ? String(r.word) : it.word).toLowerCase().trim();
+        const w0 = (useBase && r && r.word ? String(r.word) : it.word).trim(), w = it.lang === 'zh' ? w0 : w0.toLowerCase();
         if (taken.has(w)) { dupes++; return; }
         taken.add(w);
         if (!r) undefinedN++;
         rows.push({
-          ...toRow({ word: w, partOfSpeech: r?.partOfSpeech, phonetic: r?.phonetic, definition: r?.definition, context: r?.example,
+          ...toRow({ word: w, partOfSpeech: r?.partOfSpeech, phonetic: r?.phonetic, definition: r?.definition, context: r?.example, lang: it.lang, definitionZh: r?.definitionZh, contextTranslation: r?.exampleTranslation, chars: r?.chars,
             bookTitle: it.book, pageNumber: it.chapter, tags: ['kobo'], status: 'LEARNING', audioUrl: r?.audioUrl }),
           source: 'kobo', kobo_key: it.key, created_at: new Date(Date.parse(it.date) || Date.now()).toISOString()
         });

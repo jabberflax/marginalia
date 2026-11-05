@@ -33,7 +33,32 @@ Examples:
 
 const BATCH_RULE = `\n\nBATCH MODE: when given a numbered list of words, return a JSON array (and nothing else) with exactly one object per input word, in the same order. Each object follows the shape and rules above (or the error shape), plus an "input" field echoing the word exactly as given.`;
 
-type Entry = { source: string; word: string; partOfSpeech: string; phonetic: string; definition: string; example?: string; audioUrl: string };
+const STYLE_ZH = `You write entries for a reader's personal Chinese vocabulary notebook. The reader is fluent in English and reads Chinese books.
+
+For the given Chinese word or idiom, return JSON only, no prose, in this exact shape:
+{"word": string, "pinyin": string, "partOfSpeech": string, "definition": string, "definitionZh": string, "note": string, "chars": [{"c": string, "m": string}], "example": string, "exampleTranslation": string, "contextTranslation": string}
+
+Rules:
+- word: the word in SIMPLIFIED characters (convert traditional input to simplified).
+- pinyin: Hanyu Pinyin with tone marks; syllables of one word written together, separate words or idiom halves spaced, e.g. "wòxuán", "diēdàng qǐfú". Use the reading that fits the sense defined.
+- partOfSpeech: in English: noun, verb, adjective, adverb, idiom, measure word, conjunction, etc.
+- definition: one sentence in plain English, at most about 20 words, for the sense most likely meant given the sentence and book provided; otherwise the most common sense in written Chinese.
+- definitionZh: a concise definition in simplified Chinese, at most about 25 characters, without repeating the word itself.
+- note: optional, empty string if nothing useful. Start with a Chinese register label when one applies (书面语, 口语, 成语, 俗语, 方言, 网络用语), then " · " and a short English remark on usage, tone or origin. Must be accurate; leave empty if unsure.
+- chars: one entry per character of the word, in order, with a short English gloss (1-4 words) of that character's meaning as used in this word.
+- example: one natural sentence in simplified Chinese, about 12-30 characters, using the word in the sense defined. Original, not a quotation; avoid real living people.
+- exampleTranslation: a natural English translation of the example.
+- contextTranslation: a natural English translation of the sentence it appeared in, if one was provided; otherwise "".
+- If the input is not a real Chinese word or phrase, return {"error": "not_found", "suggestions": [up to 5 likely intended words]}.
+
+Examples:
+{"word":"斡旋","pinyin":"wòxuán","partOfSpeech":"verb","definition":"To mediate between opposing sides to help them reach an agreement.","definitionZh":"居中调解，使双方达成一致","note":"书面语 · Formal; common in news about diplomacy.","chars":[{"c":"斡","m":"turn"},{"c":"旋","m":"revolve, circle"}],"example":"经过联合国的斡旋，双方终于同意停火。","exampleTranslation":"After mediation by the UN, the two sides finally agreed to a ceasefire.","contextTranslation":""}
+{"word":"跌宕起伏","pinyin":"diēdàng qǐfú","partOfSpeech":"idiom","definition":"Full of ups and downs; dramatically eventful.","definitionZh":"形容事物变化多端，起落不定","note":"成语 · Four-character idiom, often used of a life or a story.","chars":[{"c":"跌","m":"fall"},{"c":"宕","m":"sway, delay"},{"c":"起","m":"rise"},{"c":"伏","m":"lie low"}],"example":"他的一生跌宕起伏，充满了传奇色彩。","exampleTranslation":"His life was full of ups and downs, like something out of a legend.","contextTranslation":""}`;
+
+const isZh = (s: string) => /\p{Script=Han}/u.test(s);
+
+type Entry = { source: string; word: string; partOfSpeech: string; phonetic: string; definition: string; example?: string; audioUrl: string;
+  lang?: string; definitionZh?: string; chars?: { c: string; m: string }[]; exampleTranslation?: string; contextTranslation?: string };
 
 const toEntry = (o: any, fallbackWord: string): Entry | null => {
   if (!o || o.error || !o.definition) return null;
@@ -44,6 +69,24 @@ const toEntry = (o: any, fallbackWord: string): Entry | null => {
     phonetic: String(o.phonetic || ""),
     definition: String(o.definition).trim() + (o.note ? "\n" + String(o.note).trim() : ""),
     example: String(o.example || "").trim(),
+    audioUrl: "",
+  };
+};
+
+const toEntryZh = (o: any, fallbackWord: string): Entry | null => {
+  if (!o || o.error || !o.definition) return null;
+  return {
+    source: "Claude",
+    lang: "zh",
+    word: String(o.word || fallbackWord).trim(),
+    partOfSpeech: String(o.partOfSpeech || ""),
+    phonetic: String(o.pinyin || ""),
+    definition: String(o.definition).trim() + (o.note ? "\n" + String(o.note).trim() : ""),
+    definitionZh: String(o.definitionZh || "").trim(),
+    chars: Array.isArray(o.chars) ? o.chars.filter((x: any) => x && x.c).map((x: any) => ({ c: String(x.c), m: String(x.m || "") })).slice(0, 12) : [],
+    example: String(o.example || "").trim(),
+    exampleTranslation: String(o.exampleTranslation || "").trim(),
+    contextTranslation: String(o.contextTranslation || "").trim(),
     audioUrl: "",
   };
 };
@@ -63,19 +106,20 @@ async function claude(word: string, context: string, book: string, key: string) 
   let user = `Word: ${word}`;
   if (context) user += `\nSentence it appeared in: ${context}`;
   if (book) user += `\nBook: ${book}`;
-  const text = await askClaude(STYLE, user, key, 400);
+  const zh = isZh(word);
+  const text = await askClaude(zh ? STYLE_ZH : STYLE, user, key, zh ? 700 : 400);
   const m = text?.match(/\{[\s\S]*\}/);
   if (!m) return null;
   const o = JSON.parse(m[0]);
   if (o.error) return { suggestions: Array.isArray(o.suggestions) ? o.suggestions.slice(0, 5) : [] };
-  return toEntry(o, word);
+  return zh ? toEntryZh(o, word) : toEntry(o, word);
 }
 
-async function claudeBatch(items: { word: string; book: string }[], key: string): Promise<(Entry | null)[]> {
+async function claudeBatch(items: { word: string; book: string }[], key: string, zh = false): Promise<(Entry | null)[]> {
   const books = [...new Set(items.map((i) => i.book).filter(Boolean))];
   const user = (books.length === 1 ? `Book: ${books[0]}\n` : "") +
     "Words:\n" + items.map((i, n) => `${n + 1}. ${i.word}` + (books.length > 1 && i.book ? ` (from ${i.book})` : "")).join("\n");
-  const text = await askClaude(STYLE + BATCH_RULE, user, key, 300 * items.length + 200);
+  const text = await askClaude((zh ? STYLE_ZH : STYLE) + BATCH_RULE, user, key, (zh ? 550 : 300) * items.length + 200);
   const m = text?.match(/\[[\s\S]*\]/);
   if (!m) return items.map(() => null);
   let arr: any[] = [];
@@ -83,7 +127,7 @@ async function claudeBatch(items: { word: string; book: string }[], key: string)
   // Match by echoed input first, then by position
   return items.map((it, n) => {
     const byInput = arr.find((o) => o && String(o.input || "").toLowerCase() === it.word.toLowerCase());
-    return toEntry(byInput || arr[n], it.word);
+    return zh ? toEntryZh(byInput || arr[n], it.word) : toEntry(byInput || arr[n], it.word);
   });
 }
 
@@ -135,7 +179,7 @@ async function freeDictionary(word: string) {
 }
 
 async function addAudio(entry: Entry, mKey?: string) {
-  if (!mKey || entry.audioUrl) return entry;
+  if (!mKey || entry.audioUrl || entry.lang === "zh") return entry;
   const mw = await merriamWebster(entry.word, mKey).catch(() => null);
   if (mw && "audioUrl" in mw) entry.audioUrl = mw.audioUrl as string;
   return entry;
@@ -155,21 +199,23 @@ async function dictionaryLookup(w: string, mKey?: string) {
 
 const EXAMPLE_SYSTEM = `You write example sentences for a reader's personal vocabulary notebook.
 For each numbered word, write one natural sentence of about 12-25 words that uses the word (any inflection is fine) in the sense given by its definition, or the sentence it was read in when provided. Original, not a quotation; avoid real living people; plain modern English.
-Return a JSON array only, one object per word in the same order: {"input": the word exactly as given, "example": the sentence}.`;
+For a Chinese word, write the sentence in simplified Chinese (about 12-30 characters) and add "translation": a natural English translation. For an English word, leave "translation" as "".
+Return a JSON array only, one object per word in the same order: {"input": the word exactly as given, "example": the sentence, "translation": string}.`;
 
-async function claudeExamples(items: { word: string; definition: string; context: string; book: string }[], key: string): Promise<string[]> {
+async function claudeExamples(items: { word: string; definition: string; context: string; book: string }[], key: string): Promise<{ example: string; translation: string }[]> {
   const user = items.map((i, n) => `${n + 1}. ${i.word}` +
     (i.definition ? `\n   Definition: ${i.definition.split("\n")[0]}` : "") +
     (i.context ? `\n   Read in: ${i.context}` : "") +
     (i.book ? `\n   Book: ${i.book}` : "")).join("\n");
-  const text = await askClaude(EXAMPLE_SYSTEM, user, key, 80 * items.length + 200);
+  const text = await askClaude(EXAMPLE_SYSTEM, user, key, 140 * items.length + 200);
   const m = text?.match(/\[[\s\S]*\]/);
-  if (!m) return items.map(() => "");
+  const none = () => items.map(() => ({ example: "", translation: "" }));
+  if (!m) return none();
   let arr: any[] = [];
-  try { arr = JSON.parse(m[0]); } catch { return items.map(() => ""); }
+  try { arr = JSON.parse(m[0]); } catch { return none(); }
   return items.map((it, n) => {
     const o = arr.find((x) => x && String(x.input || "").toLowerCase() === it.word.toLowerCase()) || arr[n];
-    return o && o.example ? String(o.example).trim() : "";
+    return { example: o && o.example ? String(o.example).trim() : "", translation: o && o.translation ? String(o.translation).trim() : "" };
   });
 }
 
@@ -191,9 +237,9 @@ Deno.serve(async (req) => {
         context: String(i?.context || "").trim().slice(0, 600),
         book: String(i?.book || "").trim().slice(0, 200),
       })).filter((i: any) => i.word);
-      if (!aKey) return json({ results: items.map((i: any) => ({ input: i.word, example: "" })), error: "no_claude_key" });
-      const ex = await claudeExamples(items, aKey).catch((e) => { console.error(e); return items.map(() => ""); });
-      return json({ results: items.map((i: any, n: number) => ({ input: i.word, example: ex[n] })) });
+      if (!aKey) return json({ results: items.map((i: any) => ({ input: i.word, example: "", translation: "" })), error: "no_claude_key" });
+      const ex = await claudeExamples(items, aKey).catch((e) => { console.error(e); return items.map(() => ({ example: "", translation: "" })); });
+      return json({ results: items.map((i: any, n: number) => ({ input: i.word, example: ex[n].example, translation: ex[n].translation })) });
     }
 
     // Batch mode (Kobo import): { items: [{ word, book }] } -> { results: [entry | { input, error }] }
@@ -202,12 +248,19 @@ Deno.serve(async (req) => {
         .map((i: any) => ({ word: cleanWord(i?.word), book: String(i?.book || "").trim().slice(0, 200) }))
         .filter((i: any) => i.word);
       if (!items.length) return json({ results: [] });
-      let entries: (Entry | null)[] = items.map(() => null);
-      if (aKey) entries = await claudeBatch(items, aKey).catch((e) => { console.error(e); return entries; });
+      const entries: (Entry | null)[] = items.map(() => null);
+      if (aKey) {
+        for (const zh of [false, true]) {
+          const idx = items.map((it: any, n: number) => (isZh(it.word) === zh ? n : -1)).filter((n: number) => n >= 0);
+          if (!idx.length) continue;
+          const got = await claudeBatch(idx.map((n: number) => items[n]), aKey, zh).catch((e) => { console.error(e); return idx.map(() => null); });
+          idx.forEach((n: number, k: number) => { entries[n] = got[k]; });
+        }
+      }
       const results = await Promise.all(items.map(async (it: any, n: number) => {
         let e = entries[n];
         if (e) e = await addAudio(e, mKey);
-        else e = (await dictionaryLookup(it.word, mKey)).entry;
+        else if (!isZh(it.word)) e = (await dictionaryLookup(it.word, mKey)).entry;
         return e ? { input: it.word, ...e } : { input: it.word, error: "not_found" };
       }));
       return json({ results });
@@ -225,6 +278,7 @@ Deno.serve(async (req) => {
       if (c && "definition" in c) return json(await addAudio(c as Entry, mKey));
       if (c && "suggestions" in c) suggestions = c.suggestions as string[];
     }
+    if (isZh(w)) return json({ error: "not_found", suggestions }, 404);
     const d = await dictionaryLookup(w, mKey);
     if (d.entry) return json(d.entry);
     return json({ error: "not_found", suggestions: suggestions.length ? suggestions : d.suggestions }, 404);
