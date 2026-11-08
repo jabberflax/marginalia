@@ -123,6 +123,35 @@ main { padding-block: 1rem 1.5rem; padding-left: max(16px, env(safe-area-inset-l
 .def { margin: 0; font-size: .85rem; line-height: 1.5; white-space: pre-line }
 .field-head { display: flex; justify-content: space-between; align-items: center; gap: .5rem }
 #exampleStatus:empty { display: none }
+.phome { display: flex; flex-direction: column; gap: .9rem; padding-top: .3rem }
+.phome-head { display: flex; justify-content: space-between; align-items: flex-start; gap: .75rem }
+.phome-due { font-family: var(--serif); font-weight: 700; font-size: 1.45rem; line-height: 1.2; text-wrap: balance }
+.streak { display: inline-flex; align-items: center; gap: .3rem; font-size: .8rem; font-weight: 600; color: var(--accent); background: var(--accent-soft); border-radius: 999px; padding: .3rem .65rem; white-space: nowrap; font-variant-numeric: tabular-nums }
+.streak svg.i { width: .95rem; height: .95rem }
+.pstart { justify-content: center; padding: .8rem; border-radius: 1rem; font-size: .9rem }
+.ptiles { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: .6rem }
+.ptile { border: 1px solid var(--line); background: var(--card); border-radius: 1rem; padding: .8rem .9rem; text-align: left; display: flex; flex-direction: column; gap: .15rem }
+.ptile b { font-weight: 600; font-size: .88rem }
+.ptile span { font-size: .72rem; color: var(--muted) }
+.ptile:hover { border-color: var(--accent) }
+.pgame { display: flex; flex-direction: column; gap: .9rem }
+.pq { font-family: var(--quote); font-size: 1.05rem; line-height: 1.65; background: var(--card); border: 1px solid var(--line); border-radius: 1rem; padding: 1rem 1.1rem }
+.pq.def { font-family: var(--sans); font-size: 1rem; line-height: 1.55 }
+.pq .gap { display: inline-block; min-width: 4.5em; border-bottom: 2px solid var(--accent); text-align: center; color: var(--accent); font-weight: 600 }
+.pq .zh, .popt .zh { font-family: var(--zh) }
+.pq .tr { display: block; font-size: .85rem; color: var(--muted); margin-top: .4rem }
+.popts { display: flex; flex-direction: column; gap: .5rem }
+.popt { border: 1px solid var(--line-strong); background: var(--card); border-radius: .85rem; padding: .75rem .95rem; font-size: 1rem; text-align: left; display: flex; justify-content: space-between; align-items: center; gap: .5rem }
+.popt:not(:disabled):hover { border-color: var(--accent) }
+.popt.ok { background: var(--good-soft); border-color: var(--good); color: var(--good) }
+.popt.bad { background: var(--bad-soft); border-color: var(--bad); color: var(--bad) }
+.popt:disabled { cursor: default }
+.pfeed { font-size: .85rem; line-height: 1.5; color: var(--muted); display: flex; flex-direction: column; gap: .3rem }
+.pfeed b { color: var(--fg); font-weight: 600 }
+.pnav { display: flex; justify-content: space-between; align-items: center; gap: .75rem }
+.pnav .btn { padding: .65rem 1.4rem }
+.pmissed { display: flex; flex-wrap: wrap; gap: .4rem }
+.pmissed span { background: var(--bad-soft); color: var(--bad); border-radius: 999px; padding: .2rem .65rem; font-size: .8rem }
 .seg { display: flex; gap: .2rem; background: var(--bg); border: 1px solid var(--line); border-radius: .8rem; padding: .2rem }
 .seg button { flex: 1; border: 0; background: transparent; border-radius: .6rem; padding: .4rem; font-size: .8rem; font-weight: 500; color: var(--muted) }
 .seg button[aria-pressed="true"] { background: var(--card); color: var(--accent); box-shadow: 0 0 0 1px var(--line) }
@@ -236,6 +265,8 @@ nav.tabs button[aria-current="page"] { color: var(--accent) }
   <symbol id="i-arrow" viewBox="0 0 24 24"><path d="M5 12h14M13 6l6 6-6 6"/></symbol>
   <symbol id="i-search" viewBox="0 0 24 24"><circle cx="11" cy="11" r="7"/><path d="m20 20-3.5-3.5"/></symbol>
   <symbol id="i-library" viewBox="0 0 24 24"><path d="M5 4v16M9 4v16M13 4v16M17 4l3 16"/></symbol>
+  <symbol id="i-check" viewBox="0 0 24 24"><path d="M20 6 9 17l-5-5"/></symbol>
+  <symbol id="i-flame" viewBox="0 0 24 24"><path d="M12 22c4 0 7-2.7 7-7 0-3.5-2.5-6.2-4.3-8.2-.5 2-1.5 3.2-2.7 3.7C12.4 7.2 11 4.5 8.5 2 8.8 5.6 5 8.6 5 14.2 5 18.6 8 22 12 22z"/></symbol>
   <symbol id="i-sort" viewBox="0 0 24 24"><path d="m3 16 4 4 4-4M7 20V4M21 8l-4-4-4 4M17 4v16"/></symbol>
 </svg>
 
@@ -295,6 +326,42 @@ nav.tabs button[aria-current="page"] { color: var(--accent) }
     </section>
 
     <section id="reviewView" class="review" hidden>
+      <div id="pHome" class="phome">
+        <div class="phome-head">
+          <div><div class="phome-due" id="pDue">Loading…</div><div class="kobo-sub" id="pDueSub"></div></div>
+          <div class="streak" id="pStreak" hidden><svg class="i"><use href="#i-flame"/></svg><span id="pStreakN">0</span></div>
+        </div>
+        <button class="btn btn-primary pstart" id="pStart">Start daily review</button>
+        <div class="status-line" id="pStatus"></div>
+        <div class="ptiles">
+          <button class="ptile" data-game="gap"><b>Fill the gap</b><span>Pick the missing word</span></button>
+          <button class="ptile" data-game="meaning"><b>Which word means…</b><span>Definition to word</span></button>
+          <button class="ptile" data-game="cards"><b>Flashcards</b><span>Flip and self-check</span></button>
+        </div>
+        <p class="kobo-sub" id="pHelp">Words you get right come back after 1, 3, 7, 21 and 60 days. Words you miss come back tomorrow. Right four times in a row and a word is Mastered.</p>
+      </div>
+
+      <div id="pGame" class="pgame" hidden>
+        <div class="progress">
+          <div class="progress-row"><span id="pLabel">Daily review</span><span id="pCount">0 / 0</span></div>
+          <div class="bar"><div id="pBar"></div></div>
+        </div>
+        <p class="label" id="pKind"></p>
+        <div class="pq" id="pQ"></div>
+        <div class="popts" id="pOpts"></div>
+        <div class="pfeed" id="pFeed" hidden></div>
+        <div class="pnav"><button class="linkbtn" id="pQuit">End session</button><button class="btn btn-primary" id="pNext" hidden>Next</button></div>
+      </div>
+
+      <div id="pDone" class="phome" hidden>
+        <div class="phome-due" id="pDoneTitle">Session done</div>
+        <p class="kobo-sub" id="pDoneSub"></p>
+        <div class="pmissed" id="pMissed"></div>
+        <button class="btn btn-primary pstart" id="pAgain">Keep going</button>
+        <button class="linkbtn" id="pBack" style="align-self:center">Back to practice</button>
+      </div>
+
+      <div id="pCards" class="review" hidden>
       <div class="progress">
         <div class="progress-row"><span id="reviewLabel">Learning words first</span><span id="reviewCount">0 / 0</span></div>
         <div class="bar"><div id="bar"></div></div>
@@ -320,12 +387,14 @@ nav.tabs button[aria-current="page"] { color: var(--accent) }
         <button class="btn btn-learning" id="learningBtn">Still learning</button>
         <button class="btn btn-mastered" id="masteredBtn">Mastered</button>
       </div>
+      <button class="linkbtn" id="cardsQuit" style="align-self:center">End session</button>
+      </div>
     </section>
   </main>
 
   <nav class="tabs" id="tabs" hidden>
     <button id="tabLibrary" aria-current="page"><svg class="i"><use href="#i-library"/></svg>Vocabulary</button>
-    <button id="tabReview"><svg class="i"><use href="#i-layers"/></svg>Flashcards</button>
+    <button id="tabReview"><svg class="i"><use href="#i-layers"/></svg>Practice</button>
   </nav>
 </div>
 
@@ -429,7 +498,7 @@ nav.tabs button[aria-current="page"] { color: var(--accent) }
 <script>
 /* Self-update: compare this page's version with version.json (never cached) and reload once if newer. */
 (() => {
-  const APP_VERSION = '10';
+  const APP_VERSION = '11';
   async function check() {
     try {
       const r = await fetch('version.json?t=' + Date.now(), { cache: 'no-store' });
@@ -473,7 +542,9 @@ nav.tabs button[aria-current="page"] { color: var(--accent) }
   // DB row <-> app object
   const fromRow = r => ({ id: r.id, word: r.word, partOfSpeech: r.part_of_speech, phonetic: r.phonetic, definition: r.definition,
     context: r.context, bookTitle: r.book_title, pageNumber: r.page_number, tags: r.tags || [], status: r.status,
-    audioUrl: r.audio_url, createdAt: Date.parse(r.created_at), source: r.source || 'manual', koboKey: r.kobo_key || null, lang: r.lang || 'en', definitionZh: r.definition_zh || '', contextTranslation: r.context_translation || '', chars: Array.isArray(r.chars) ? r.chars : [] });
+    audioUrl: r.audio_url, createdAt: Date.parse(r.created_at), source: r.source || 'manual', koboKey: r.kobo_key || null, lang: r.lang || 'en', definitionZh: r.definition_zh || '', contextTranslation: r.context_translation || '', chars: Array.isArray(r.chars) ? r.chars : [],
+    box: r.box || 0, dueAt: r.due_at ? Date.parse(r.due_at) : null, lapses: r.lapses || 0, reviewCount: r.review_count || 0,
+    practice: Array.isArray(r.practice_sentences) ? r.practice_sentences : [], practiceSeen: r.practice_seen || 0 });
   const toRow = w => ({ word: w.word, part_of_speech: w.partOfSpeech || '', phonetic: w.phonetic || '', definition: w.definition || '',
     context: w.context || '', book_title: w.bookTitle || '', page_number: w.pageNumber || '', tags: w.tags || [],
     status: w.status === 'MASTERED' ? 'MASTERED' : 'LEARNING', audio_url: w.audioUrl || '', lang: w.lang === 'zh' ? 'zh' : 'en', definition_zh: w.definitionZh || '', context_translation: w.contextTranslation || '', chars: w.chars || [] });
@@ -585,7 +656,7 @@ nav.tabs button[aria-current="page"] { color: var(--accent) }
     curLang = l; try { localStorage.setItem('marginalia_lang', l); } catch {}
     $('bookFilter').value = 'ALL';
     renderLibrary();
-    if (!$('reviewView').hidden) startReview();
+    if (!$('reviewView').hidden) showPracticeHome();
   }
   $('langSeg').addEventListener('click', e => { const b = e.target.closest('[data-l]'); if (b) setLang(b.dataset.l); });
 
@@ -661,7 +732,7 @@ nav.tabs button[aria-current="page"] { color: var(--accent) }
 
   // ---------- add / edit ----------
   const F = { word: 'fWordIn', partOfSpeech: 'fPosIn', phonetic: 'fPhonIn', definition: 'fDefIn', definitionZh: 'fDefZhIn', contextTranslation: 'fCtxTrIn', context: 'fCtxIn', bookTitle: 'fBookIn', pageNumber: 'fPageIn', status: 'fStatusIn', audioUrl: 'fAudioIn' };
-  function resetSheet() { status($('defineStatus')); status($('saveStatus')); status($('exampleStatus')); $('suggest').hidden = true; $('suggest').innerHTML = ''; }
+  function resetSheet() { pendingPractice = null; status($('defineStatus')); status($('saveStatus')); status($('exampleStatus')); $('suggest').hidden = true; $('suggest').innerHTML = ''; }
   function openAdd(word = '', ctx = '') {
     editId = null; $('sheetTitle').textContent = 'Add word';
     $('wordForm').reset(); $('fAudioIn').value = '';
@@ -760,6 +831,7 @@ nav.tabs button[aria-current="page"] { color: var(--accent) }
     status($('defineStatus'), 'From CC-CEDICT. Edit anything before saving.');
   }
 
+  let pendingPractice = null; // practice sentences that came back with the last Define
   let lookupSeq = 0;
   async function define() {
     const word = $('fWordIn').value.trim(); if (!word) return;
@@ -781,6 +853,7 @@ nav.tabs button[aria-current="page"] { color: var(--accent) }
         if (body.example && !hadCtx) { $('fCtxIn').value = body.example; $('fCtxTrIn').value = body.exampleTranslation || ''; }
         else if (hadCtx && body.contextTranslation && !$('fCtxTrIn').value.trim()) $('fCtxTrIn').value = body.contextTranslation;
         if (body.lang === 'zh') { $('fDefZhIn').value = body.definitionZh || ''; $('fCharsIn').value = JSON.stringify(body.chars || []); }
+        pendingPractice = Array.isArray(body.practice) && body.practice.length ? body.practice : null;
         updateFormLang();
         status($('defineStatus'), 'From ' + (body.source || 'the dictionary') + '. Edit anything before saving.');
       } else if (body && body.suggestions && body.suggestions.length) {
@@ -807,11 +880,14 @@ nav.tabs button[aria-current="page"] { color: var(--accent) }
     };
     if (!w.word) return;
     $('saveBtn').disabled = true; status($('saveStatus'), 'Saving…');
-    const q = editId ? sb.from('words').update(toRow(w)).eq('id', editId).select().single()
-                     : sb.from('words').insert(toRow(w)).select().single();
+    const row = toRow(w);
+    if (pendingPractice) { row.practice_sentences = pendingPractice; row.practice_seen = 0; }
+    const q = editId ? sb.from('words').update(row).eq('id', editId).select().single()
+                     : sb.from('words').insert(row).select().single();
     const { data, error } = await q;
     $('saveBtn').disabled = false;
     if (error) { status($('saveStatus'), 'Could not save: ' + error.message + '. Tap Save again.', true); return; }
+    pendingPractice = null;
     const saved = fromRow(data);
     words = editId ? words.map(x => x.id === editId ? saved : x) : [saved, ...words];
     lastBook = w.bookTitle;
@@ -864,12 +940,12 @@ nav.tabs button[aria-current="page"] { color: var(--accent) }
   });
 
   // ---------- flashcards ----------
-  function startReview() {
+  function startReview(list) {
     const pool = words.filter(inLang);
     const learning = pool.filter(w => w.status !== 'MASTERED');
-    queue = (learning.length ? learning : pool).map(w => w.id);
-    for (let i = queue.length - 1; i > 0; i--) { const j = Math.floor(Math.random() * (i + 1)); [queue[i], queue[j]] = [queue[j], queue[i]]; }
-    $('reviewLabel').textContent = learning.length ? 'Learning words' : 'Everything is mastered, reviewing all';
+    const src = list && list.length ? list : (learning.length ? learning : pool);
+    queue = shuffle(src.map(w => w.id));
+    $('reviewLabel').textContent = list && list.length ? 'Due and new words' : learning.length ? 'Learning words' : 'Everything is mastered, reviewing all';
     qi = 0; renderCard();
   }
   function renderCard() {
@@ -899,12 +975,9 @@ nav.tabs button[aria-current="page"] { color: var(--accent) }
   async function mark(st) {
     const id = queue[qi]; if (!id) return;
     const w = words.find(x => x.id === id);
-    if (w && w.status !== st) {
-      const { error } = await sb.from('words').update({ status: st }).eq('id', id);
-      if (error) showBanner('Could not update that card: ' + error.message); else w.status = st;
-    }
+    if (w) recordAnswer(w, st === 'MASTERED', 'cards', { forceMastered: st === 'MASTERED' });
     qi++;
-    if (qi >= queue.length) { queue = []; renderCard(); $('reviewLabel').textContent = 'Round finished. Tap Flashcards to go again.'; }
+    if (qi >= queue.length) { queue = []; renderCard(); $('reviewLabel').textContent = 'Round finished.'; }
     else renderCard();
   }
   const flip = () => $('card').classList.toggle('flipped');
@@ -928,7 +1001,7 @@ nav.tabs button[aria-current="page"] { color: var(--accent) }
     const lib = which === 'library';
     $('libraryView').hidden = !lib; $('reviewView').hidden = lib;
     if (lib) { $('tabLibrary').setAttribute('aria-current', 'page'); $('tabReview').removeAttribute('aria-current'); renderLibrary(); }
-    else { $('tabReview').setAttribute('aria-current', 'page'); $('tabLibrary').removeAttribute('aria-current'); startReview(); }
+    else { $('tabReview').setAttribute('aria-current', 'page'); $('tabLibrary').removeAttribute('aria-current'); showPracticeHome(); }
   }
   $('tabLibrary').addEventListener('click', () => tab('library'));
   $('tabReview').addEventListener('click', () => tab('review'));
@@ -964,6 +1037,227 @@ nav.tabs button[aria-current="page"] { color: var(--accent) }
     status($('importStatus'), `Imported ${rows.length} word${rows.length === 1 ? '' : 's'}.`);
     loadWords();
   });
+
+  // ---------- practice: spaced review + games ----------
+  // Schedule (Leitner boxes): right answers move a word up a box, wrong answers drop it to box 1.
+  // Box 1 = 1 day, 2 = 3 days, 3 = 7 days, 4 = 21 days (Mastered), 5 = 60 days.
+  const INTERVALS = [0, 1, 3, 7, 21, 60], MASTERED_BOX = 4, SESSION_MAX = 20, NEW_PER_SESSION = 10;
+  const PRACTICE_AI_ZH = true; // fetch Claude practice sentences for Chinese words too (definitions stay on CC-CEDICT)
+  const DAY = 86400000;
+  const shuffle = a => { a = a.slice(); for (let i = a.length - 1; i > 0; i--) { const j = Math.floor(Math.random() * (i + 1)); [a[i], a[j]] = [a[j], a[i]]; } return a; };
+  const startOfDay = (t = Date.now()) => { const d = new Date(t); d.setHours(0, 0, 0, 0); return d.getTime(); };
+  const dayKey = t => { const d = new Date(t); return d.getFullYear() + '-' + (d.getMonth() + 1) + '-' + d.getDate(); };
+  const isNewWord = w => !w.reviewCount && !w.dueAt;
+  const isDue = w => !!w.dueAt && w.dueAt < startOfDay() + DAY;
+  const firstLine = s => String(s || '').split('\n')[0].trim();
+
+  let reviewDays = new Set(), streakLoaded = false;
+  async function loadStreak() {
+    const { data, error } = await sb.from('reviews').select('created_at').order('created_at', { ascending: false }).limit(2000);
+    if (error) return;
+    reviewDays = new Set(data.map(r => dayKey(Date.parse(r.created_at)))); streakLoaded = true;
+  }
+  function streakCount() {
+    let t = startOfDay(), n = 0;
+    if (!reviewDays.has(dayKey(t))) t -= DAY; // today not done yet: count up to yesterday
+    while (reviewDays.has(dayKey(t))) { n++; t -= DAY; }
+    return n;
+  }
+  function dailyList() {
+    const pool = words.filter(inLang);
+    const due = pool.filter(isDue).sort((a, b) => a.dueAt - b.dueAt).slice(0, SESSION_MAX);
+    const fresh = pool.filter(isNewWord).sort((a, b) => a.createdAt - b.createdAt).slice(0, Math.min(NEW_PER_SESSION, SESSION_MAX - due.length));
+    return { due, fresh, list: shuffle([...due, ...fresh]) };
+  }
+  function showPracticeHome() {
+    ['pGame', 'pDone', 'pCards'].forEach(id => $(id).hidden = true); $('pHome').hidden = false;
+    const { due, fresh } = dailyList(), n = due.length + fresh.length;
+    const pool = words.filter(inLang);
+    $('pDue').textContent = !pool.length ? (curLang === 'zh' ? 'No Chinese words yet' : 'No words yet')
+      : n ? `${n} word${n === 1 ? '' : 's'} to review today` : 'All caught up for today';
+    $('pDueSub').textContent = !pool.length ? 'Add some words, then come back to practise.'
+      : n ? [due.length && `${due.length} due`, fresh.length && `${fresh.length} new`].filter(Boolean).join(' · ') + ` · about ${Math.max(1, Math.round(n * 0.25))} min`
+      : 'Your next words come back ' + nextDueText() + '. The games below are still open.';
+    $('pStart').hidden = !n;
+    $('pHelp').hidden = !pool.length;
+    document.querySelectorAll('.ptile').forEach(b => b.disabled = pool.length < 4 && b.dataset.game !== 'cards');
+    status($('pStatus'), pool.length && pool.length < 4 ? 'The quiz games need at least 4 words in this language.' : '');
+    const paint = () => { const k = streakCount(); $('pStreak').hidden = !k; $('pStreakN').textContent = k + '-day streak'; };
+    paint(); if (!streakLoaded) loadStreak().then(paint);
+  }
+  function nextDueText() {
+    const next = words.filter(inLang).filter(w => w.dueAt).sort((a, b) => a.dueAt - b.dueAt)[0];
+    if (!next) return 'once you’ve practised them';
+    const days = Math.round((startOfDay(next.dueAt) - startOfDay()) / DAY);
+    return days <= 1 ? 'tomorrow' : `in ${days} days`;
+  }
+
+  // Save one answer: update the word's schedule and log it for the streak.
+  function recordAnswer(w, correct, game, opts = {}) {
+    const wasScheduled = !isNewWord(w), due = isNewWord(w) || isDue(w);
+    let box = w.box || 0;
+    if (opts.retry) { /* second try in the same session: practice only */ }
+    else if (correct && (due || opts.forceMastered)) box = opts.forceMastered ? Math.max(box + 1, MASTERED_BOX) : Math.min(box + 1, 5);
+    else if (!correct) box = 1;
+    const changed = !opts.retry && (box !== (w.box || 0) || !correct || due || opts.forceMastered);
+    const patch = { review_count: (w.reviewCount || 0) + 1, last_reviewed_at: new Date().toISOString() };
+    if (changed) {
+      patch.box = box; patch.due_at = new Date(startOfDay() + INTERVALS[box] * DAY + 3 * 3600000).toISOString();
+      patch.status = box >= MASTERED_BOX ? 'MASTERED' : 'LEARNING';
+      if (!correct && wasScheduled) patch.lapses = (w.lapses || 0) + 1;
+      w.box = box; w.dueAt = Date.parse(patch.due_at); w.status = patch.status; if (patch.lapses) w.lapses = patch.lapses;
+    }
+    w.reviewCount = patch.review_count;
+    if (opts.practiceSeen != null) { patch.practice_seen = opts.practiceSeen; w.practiceSeen = opts.practiceSeen; }
+    reviewDays.add(dayKey(Date.now()));
+    sb.from('words').update(patch).eq('id', w.id).then(({ error }) => { if (error) showBanner('Could not save your answer: ' + error.message); });
+    sb.from('reviews').insert({ word_id: w.id, correct: !!correct, game }).then(() => {});
+    return changed ? box : null;
+  }
+
+  // ----- sentence pools
+  const needsPool = w => (w.lang !== 'zh' || PRACTICE_AI_ZH) && (!w.practice.length || w.practiceSeen >= w.practice.length);
+  async function ensurePools(list) {
+    const todo = list.filter(needsPool);
+    for (let i = 0; i < todo.length; i += 10) {
+      const batch = todo.slice(i, i + 10);
+      status($('pStatus'), `Writing practice sentences… ${Math.min(i + batch.length, todo.length)} of ${todo.length}`);
+      try {
+        const { data, error } = await sb.functions.invoke('define', { body: { practice: batch.map(w => ({ word: w.word, definition: firstLine(w.definition) || w.definitionZh })) } });
+        if (error || !data || !Array.isArray(data.results)) continue;
+        await Promise.all(batch.map(async (w, j) => {
+          const p = data.results[j] && data.results[j].practice;
+          if (!p || !p.length) return;
+          const { error } = await sb.from('words').update({ practice_sentences: p, practice_seen: 0 }).eq('id', w.id);
+          if (!error) { w.practice = p; w.practiceSeen = 0; }
+        }));
+      } catch {}
+    }
+    status($('pStatus'));
+  }
+  // Mark the word inside a sentence the reader wrote or imported, as {{form}}.
+  function markSentence(sent, w) {
+    sent = String(sent || '').trim(); if (!sent) return null;
+    if (w.lang === 'zh') { const i = sent.indexOf(w.word); return i < 0 ? null : sent.slice(0, i) + '{{' + w.word + '}}' + sent.slice(i + w.word.length); }
+    const tryRe = stem => { const m = new RegExp('(^|[^\\p{L}])(' + reEsc(stem) + '\\p{L}*)', 'iu').exec(sent); return m ? sent.slice(0, m.index + m[1].length) + '{{' + m[2] + '}}' + sent.slice(m.index + m[0].length) : null; };
+    return tryRe(w.word) || (w.word.length > 5 ? tryRe(w.word.slice(0, w.word.length - 2)) : null);
+  }
+  // Pick the next sentence for a word: AI pool first (rotating), then its own example.
+  function gapFor(w) {
+    const pool = (w.practice || []).filter(p => /\{\{[^{}]+\}\}/.test(p.s));
+    if (pool.length) { const i = (w.practiceSeen || 0) % pool.length; return { s: pool[i].s, t: pool[i].t || '', next: (w.practiceSeen || 0) + 1 }; }
+    const m = markSentence(w.context, w);
+    return m ? { s: m, t: w.lang === 'zh' ? w.contextTranslation || '' : '', next: null } : null;
+  }
+  function distractors(w) {
+    const pool = words.filter(x => inLang(x) && x.id !== w.id && x.word.toLowerCase() !== w.word.toLowerCase());
+    const pos = (w.partOfSpeech || '').toLowerCase();
+    const scored = shuffle(pool).map(x => ({ x, s: ((x.partOfSpeech || '').toLowerCase() === pos && pos ? 2 : 0) + (x.bookTitle && x.bookTitle === w.bookTitle ? 1 : 0) + Math.random() }));
+    const out = [], seen = new Set([w.word.toLowerCase()]);
+    for (const { x } of scored.sort((a, b) => b.s - a.s)) { const k = x.word.toLowerCase(); if (!seen.has(k)) { seen.add(k); out.push(x); } if (out.length === 3) break; }
+    return out.length === 3 ? out : null;
+  }
+
+  // ----- sessions
+  let sess = null; // { mode, items: [{ w, retry }], i, right, wrong: Set, answered }
+  async function startSession(mode) {
+    if (mode === 'cards') {
+      const { list } = dailyList();
+      ['pHome', 'pGame', 'pDone'].forEach(id => $(id).hidden = true); $('pCards').hidden = false;
+      startReview(list); return;
+    }
+    let { list } = dailyList();
+    const extra = !list.length || mode !== 'daily';
+    if (mode !== 'daily' && list.length < 5) list = shuffle(words.filter(inLang)).slice(0, 10); // nothing due: practise a random set
+    if (!list.length) return;
+    $('pStart').disabled = true; document.querySelectorAll('.ptile').forEach(b => b.disabled = true);
+    await ensurePools(mode === 'meaning' ? [] : list);
+    $('pStart').disabled = false; document.querySelectorAll('.ptile').forEach(b => b.disabled = false);
+    sess = { mode, items: list.map(w => ({ w, retry: false })), i: 0, right: 0, wrong: new Map(), extra };
+    $('pLabel').textContent = mode === 'daily' ? 'Daily review' : mode === 'gap' ? 'Fill the gap' : 'Which word means…';
+    ['pHome', 'pDone', 'pCards'].forEach(id => $(id).hidden = true); $('pGame').hidden = false;
+    nextQuestion();
+  }
+  function nextQuestion() {
+    while (sess.i < sess.items.length) {
+      const it = sess.items[sess.i];
+      const q = buildQuestion(it.w, sess.mode);
+      if (q) { renderQuestion(it, q); return; }
+      sess.i++; // can't make a question for this word (e.g. too few words): skip it
+    }
+    finishSession();
+  }
+  function buildQuestion(w, mode) {
+    const others = distractors(w); if (!others) return null;
+    const gap = mode !== 'meaning' ? gapFor(w) : null;
+    const def = firstLine(w.definition) || w.definitionZh;
+    let kind = mode === 'gap' ? 'gap' : mode === 'meaning' ? 'meaning' : (gap && (!def || Math.random() < 0.6) ? 'gap' : 'meaning');
+    if (kind === 'gap' && !gap) kind = def ? 'meaning' : null;
+    if (kind === 'meaning' && !def) kind = gap ? 'gap' : null;
+    if (!kind) return null;
+    return { kind, gap, def, options: shuffle([w, ...others]) };
+  }
+  function renderQuestion(it, q) {
+    const { w } = it, zh = w.lang === 'zh', total = sess.items.length;
+    $('pCount').textContent = `${Math.min(sess.i + 1, total)} / ${total}`;
+    $('pBar').style.width = (sess.i / total * 100) + '%';
+    $('pKind').textContent = q.kind === 'gap' ? (it.retry ? 'Try again · Fill the gap' : 'Fill the gap') : (it.retry ? 'Try again · Which word means…' : 'Which word means…');
+    const pq = $('pQ'); pq.classList.toggle('def', q.kind === 'meaning');
+    if (q.kind === 'gap') {
+      const blank = zh ? '<span class="gap">　　</span>' : '<span class="gap"> </span>';
+      pq.innerHTML = `<span class="${zh ? 'zh' : ''}"${zh ? ' lang="zh-Hans"' : ''}>${esc(q.gap.s).replace(/\{\{[^{}]+\}\}/, blank)}</span>`;
+    } else {
+      let d = q.def; const re = new RegExp(reEsc(w.word), 'gi'); d = d.replace(re, '___');
+      pq.textContent = d.length > 220 ? d.slice(0, 218) + '…' : d;
+    }
+    $('pOpts').innerHTML = q.options.map((o, k) => `<button class="popt" data-k="${k}"><span class="${zh ? 'zh' : ''}"${zh ? ' lang="zh-Hans"' : ''}>${esc(o.word)}</span></button>`).join('');
+    $('pFeed').hidden = true; $('pNext').hidden = true;
+    sess.cur = { it, q };
+  }
+  $('pOpts').addEventListener('click', e => {
+    const b = e.target.closest('.popt'); if (!b || !sess || !sess.cur || sess.cur.done) return;
+    const { it, q } = sess.cur, w = it.w, pick = q.options[+b.dataset.k], correct = pick.id === w.id;
+    sess.cur.done = true;
+    document.querySelectorAll('.popt').forEach((x, k) => {
+      x.disabled = true;
+      if (q.options[k].id === w.id) { x.classList.add('ok'); x.insertAdjacentHTML('beforeend', '<svg class="i"><use href="#i-check"/></svg>'); }
+      else if (x === b) { x.classList.add('bad'); x.insertAdjacentHTML('beforeend', '<svg class="i"><use href="#i-x"/></svg>'); }
+    });
+    const box = recordAnswer(w, correct, q.kind, { retry: it.retry, practiceSeen: q.kind === 'gap' && q.gap.next != null && !it.retry ? q.gap.next : null });
+    if (correct && !it.retry) sess.right++;
+    if (!correct && !it.retry) { sess.wrong.set(w.id, w); sess.items.push({ w, retry: true }); } // see it again at the end
+    // feedback
+    const zh = w.lang === 'zh';
+    const lines = [];
+    if (q.kind === 'gap') {
+      const filled = esc(q.gap.s).replace(/\{\{([^{}]+)\}\}/, '<b>$1</b>');
+      lines.push(`<span class="${zh ? 'zh' : ''}">${filled}</span>` + (q.gap.t ? `<span>${esc(q.gap.t)}</span>` : ''));
+    }
+    lines.push(`<span><b${zh ? ' class="zh"' : ''}>${esc(w.word)}</b>${w.phonetic ? ' · ' + esc(w.phonetic) : ''}${w.partOfSpeech ? ' · <i>' + esc(w.partOfSpeech) + '</i>' : ''} · ${esc(firstLine(w.definition) || w.definitionZh || '')}</span>`);
+    if (!correct && pick) lines.push(`<span>You picked <b${zh ? ' class="zh"' : ''}>${esc(pick.word)}</b>: ${esc(firstLine(pick.definition) || pick.definitionZh || '')}</span>`);
+    if (box != null) lines.push(`<span>${correct ? (box >= MASTERED_BOX ? 'Mastered. ' : '') + 'Next review ' + (INTERVALS[box] === 1 ? 'tomorrow' : `in ${INTERVALS[box]} days`) + '.' : 'It comes back at the end of this session, and again tomorrow.'}</span>`);
+    $('pFeed').innerHTML = lines.join(''); $('pFeed').hidden = false;
+    $('pNext').hidden = false; $('pNext').focus();
+  });
+  $('pNext').addEventListener('click', () => { if (!sess) return; sess.i++; sess.cur = null; nextQuestion(); });
+  $('pQuit').addEventListener('click', () => finishSession());
+  $('cardsQuit').addEventListener('click', () => showPracticeHome());
+  function finishSession() {
+    if (!sess) return showPracticeHome();
+    const firsts = sess.items.filter(x => !x.retry).length;
+    ['pHome', 'pGame', 'pCards'].forEach(id => $(id).hidden = true); $('pDone').hidden = false;
+    $('pDoneTitle').textContent = sess.right === firsts && firsts ? 'All correct' : `${sess.right} of ${firsts} right`;
+    const k = streakCount();
+    $('pDoneSub').textContent = (k ? `${k}-day streak. ` : '') + (sess.wrong.size ? 'These come back tomorrow:' : 'Every word moved up a step.');
+    $('pMissed').innerHTML = [...sess.wrong.values()].map(w => `<span${w.lang === 'zh' ? ' lang="zh-Hans" class="zh"' : ''}>${esc(w.word)}</span>`).join('');
+    const left = dailyList().list.length;
+    $('pAgain').hidden = !left; $('pAgain').textContent = `Keep going (${left} more)`;
+    sess = null;
+  }
+  $('pStart').addEventListener('click', () => startSession('daily'));
+  $('pAgain').addEventListener('click', () => startSession('daily'));
+  $('pBack').addEventListener('click', showPracticeHome);
+  document.querySelectorAll('.ptile').forEach(b => b.addEventListener('click', () => startSession(b.dataset.game)));
 
   // ---------- example sentences ----------
   async function fetchExamples(items) {
@@ -1244,7 +1538,8 @@ nav.tabs button[aria-current="page"] { color: var(--accent) }
           ...toRow({ word: w, partOfSpeech: r?.partOfSpeech, phonetic: r?.phonetic, definition: r?.definition, context: ctx, lang: it.lang, definitionZh: r?.definitionZh,
             contextTranslation: it.context ? r?.contextTranslation : r?.exampleTranslation, chars: r?.chars,
             bookTitle: it.book, pageNumber: it.chapter, tags: [it.source || 'kobo'], status: 'LEARNING', audioUrl: r?.audioUrl }),
-          source: it.source || 'kobo', kobo_key: it.key, created_at: new Date(Date.parse(it.date) || Date.now()).toISOString()
+          source: it.source || 'kobo', kobo_key: it.key, created_at: new Date(Date.parse(it.date) || Date.now()).toISOString(),
+          practice_sentences: Array.isArray(r?.practice) ? r.practice : []
         });
       });
       if (!rows.length) continue;
