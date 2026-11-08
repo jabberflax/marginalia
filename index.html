@@ -498,7 +498,7 @@ nav.tabs button[aria-current="page"] { color: var(--accent) }
 <script>
 /* Self-update: compare this page's version with version.json (never cached) and reload once if newer. */
 (() => {
-  const APP_VERSION = '12';
+  const APP_VERSION = '13';
   async function check() {
     try {
       const r = await fetch('version.json?t=' + Date.now(), { cache: 'no-store' });
@@ -607,8 +607,9 @@ nav.tabs button[aria-current="page"] { color: var(--accent) }
     const was = user?.id;
     user = session?.user || null;
     if (!user) { words = []; showAuth(); return; }
+    if (was === user.id) return; // token refresh when you come back to the app: keep the current screen
     showApp();
-    if (was !== user.id) loadWords();
+    loadWords();
   });
 
   // ---------- data ----------
@@ -616,8 +617,10 @@ nav.tabs button[aria-current="page"] { color: var(--accent) }
     const { data, error } = await sb.from('words').select('*').order('created_at', { ascending: false });
     if (error) { showBanner('Could not load your words: ' + error.message + '. Pull to refresh or reopen the app.'); $('list').innerHTML = ''; return; }
     showBanner('');
-    words = data.map(fromRow);
+    const fresh = !words.length;
+    words = data.map(fromRow).map(w => { const old = sessWord(w.id); return old ? Object.assign(old, w) : w; });
     renderLibrary();
+    if (fresh) restoreSession();
     const b = await sb.from('books').select('title,chapters');
     if (!b.error) books = new Map(b.data.map(x => [x.title.trim().toLowerCase(), { title: x.title, chapters: x.chapters || [] }]));
   }
@@ -979,6 +982,7 @@ nav.tabs button[aria-current="page"] { color: var(--accent) }
     qi++;
     if (qi >= queue.length) { queue = []; renderCard(); $('reviewLabel').textContent = 'Round finished.'; }
     else renderCard();
+    saveSession();
   }
   const flip = () => $('card').classList.toggle('flipped');
   $('card').addEventListener('click', (e) => { if (!e.target.closest('button')) flip(); });
@@ -999,9 +1003,11 @@ nav.tabs button[aria-current="page"] { color: var(--accent) }
   // ---------- tabs ----------
   function tab(which) {
     const lib = which === 'library';
+    try { localStorage.setItem('marginalia_tab', lib ? 'library' : 'review'); } catch {}
     $('libraryView').hidden = !lib; $('reviewView').hidden = lib;
     if (lib) { $('tabLibrary').setAttribute('aria-current', 'page'); $('tabReview').removeAttribute('aria-current'); renderLibrary(); }
-    else { $('tabReview').setAttribute('aria-current', 'page'); $('tabLibrary').removeAttribute('aria-current'); showPracticeHome(); }
+    else { $('tabReview').setAttribute('aria-current', 'page'); $('tabLibrary').removeAttribute('aria-current');
+      if (!sess && !(queue.length && !$('pCards').hidden)) showPracticeHome(); } // a running session stays where you left it
   }
   $('tabLibrary').addEventListener('click', () => tab('library'));
   $('tabReview').addEventListener('click', () => tab('review'));
@@ -1166,12 +1172,45 @@ nav.tabs button[aria-current="page"] { color: var(--accent) }
   }
 
   // ----- sessions
-  let sess = null; // { mode, items: [{ w, retry }], i, right, wrong: Set, answered }
+  let sess = null; // { mode, items: [{ w, retry }], i, right, wrong: Map, answered }
+  const SESS_KEY = 'marginalia_session', SESS_TTL = 6 * 3600000;
+  // Keep the objects a running session points at when the word list reloads
+  function sessWord(id) { return sess ? (sess.items.find(x => x.w.id === id) || {}).w : null; }
+  function saveSession() {
+    try {
+      if (sess) localStorage.setItem(SESS_KEY, JSON.stringify({ kind: 'game', mode: sess.mode, lang: curLang, at: Date.now(),
+        items: sess.items.map(x => [x.w.id, x.retry ? 1 : 0]), i: sess.i + (sess.cur && sess.cur.done ? 1 : 0), right: sess.right, wrong: [...sess.wrong.keys()], extra: !!sess.extra }));
+      else if (!$('pCards').hidden && queue.length) localStorage.setItem(SESS_KEY, JSON.stringify({ kind: 'cards', lang: curLang, at: Date.now(), queue, qi }));
+      else localStorage.removeItem(SESS_KEY);
+    } catch {}
+  }
+  function restoreSession() {
+    let saved = null, lastTab = 'library';
+    try { saved = JSON.parse(localStorage.getItem(SESS_KEY) || 'null'); lastTab = localStorage.getItem('marginalia_tab') || 'library'; } catch {}
+    if (saved && (Date.now() - saved.at > SESS_TTL || !saved.lang)) { saved = null; try { localStorage.removeItem(SESS_KEY); } catch {} }
+    if (!saved) { if (lastTab === 'review') tab('review'); return; }
+    if (saved.lang !== curLang) setLang(saved.lang);
+    tab('review');
+    const byId = new Map(words.map(w => [w.id, w]));
+    if (saved.kind === 'cards') {
+      const q = (saved.queue || []).filter(id => byId.has(id));
+      if (!q.length) return;
+      ['pHome', 'pGame', 'pDone'].forEach(id => $(id).hidden = true); $('pCards').hidden = false;
+      queue = q; qi = Math.min(saved.qi || 0, q.length); $('reviewLabel').textContent = 'Due and new words'; renderCard();
+      return;
+    }
+    const items = (saved.items || []).filter(([id]) => byId.has(id)).map(([id, r]) => ({ w: byId.get(id), retry: !!r }));
+    if (!items.length) return;
+    sess = { mode: saved.mode, items, i: saved.i || 0, right: saved.right || 0, wrong: new Map((saved.wrong || []).filter(id => byId.has(id)).map(id => [id, byId.get(id)])), extra: saved.extra };
+    $('pLabel').textContent = sess.mode === 'daily' ? 'Daily review' : sess.mode === 'gap' ? 'Fill the gap' : 'Which word means…';
+    ['pHome', 'pDone', 'pCards'].forEach(id => $(id).hidden = true); $('pGame').hidden = false;
+    nextQuestion();
+  }
   async function startSession(mode) {
     if (mode === 'cards') {
       const { list } = dailyList();
       ['pHome', 'pGame', 'pDone'].forEach(id => $(id).hidden = true); $('pCards').hidden = false;
-      startReview(list); return;
+      startReview(list); saveSession(); return;
     }
     let { list } = dailyList();
     const extra = !list.length || mode !== 'daily';
@@ -1232,6 +1271,7 @@ nav.tabs button[aria-current="page"] { color: var(--accent) }
     $('pOpts').innerHTML = q.options.map((o, k) => `<button class="popt" data-k="${k}"><span class="${zh ? 'zh' : ''}"${zh ? ' lang="zh-Hans"' : ''}>${esc(o.label)}</span></button>`).join('');
     $('pFeed').hidden = true; $('pNext').hidden = true;
     sess.cur = { it, q };
+    saveSession();
   }
   $('pOpts').addEventListener('click', e => {
     const b = e.target.closest('.popt'); if (!b || !sess || !sess.cur || sess.cur.done) return;
@@ -1258,11 +1298,12 @@ nav.tabs button[aria-current="page"] { color: var(--accent) }
     if (!correct && pick) { const pd = firstLine(pick.definition) || pick.definitionZh || ''; lines.push(`<span>You picked <b${zh ? ' class="zh"' : ''}>${esc(pick.word)}</b>${pd ? ': ' + esc(pd) : '.'}</span>`); }
     if (box != null) lines.push(`<span>${correct ? (box >= MASTERED_BOX ? 'Mastered. ' : '') + 'Next review ' + (INTERVALS[box] === 1 ? 'tomorrow' : `in ${INTERVALS[box]} days`) + '.' : 'It comes back at the end of this session, and again tomorrow.'}</span>`);
     $('pFeed').innerHTML = lines.join(''); $('pFeed').hidden = false;
+    saveSession();
     $('pNext').hidden = false; $('pNext').focus();
   });
   $('pNext').addEventListener('click', () => { if (!sess) return; sess.i++; sess.cur = null; nextQuestion(); });
   $('pQuit').addEventListener('click', () => finishSession());
-  $('cardsQuit').addEventListener('click', () => showPracticeHome());
+  $('cardsQuit').addEventListener('click', () => { queue = []; saveSession(); showPracticeHome(); });
   function finishSession() {
     if (!sess) return showPracticeHome();
     const firsts = sess.items.filter(x => !x.retry).length;
@@ -1273,7 +1314,7 @@ nav.tabs button[aria-current="page"] { color: var(--accent) }
     $('pMissed').innerHTML = [...sess.wrong.values()].map(w => `<span${w.lang === 'zh' ? ' lang="zh-Hans" class="zh"' : ''}>${esc(w.word)}</span>`).join('');
     const left = dailyList().list.length;
     $('pAgain').hidden = !left; $('pAgain').textContent = `Keep going (${left} more)`;
-    sess = null;
+    sess = null; saveSession();
   }
   $('pStart').addEventListener('click', () => startSession('daily'));
   $('pAgain').addEventListener('click', () => startSession('daily'));
