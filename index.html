@@ -1293,6 +1293,16 @@ nav.tabs button[aria-current="page"] { color: var(--accent) }
       const filled = esc(q.gap.s.slice(0, a)) + '<b>' + esc(q.gap.s.slice(a, b2)) + '</b>' + esc(q.gap.s.slice(b2));
       lines.push(`<span class="${zh ? 'zh' : ''}">${filled}</span>` + (q.gap.t ? `<span>${esc(q.gap.t)}</span>` : ''));
     }
+    if (q.kind === 'meaning') {
+      // Show the word in a sentence: one of Claude's practice sentences, or else its example sentence
+      const item = poolOf(w)[(w.practiceSeen || 0) % Math.max(1, poolOf(w).length)];
+      const sent = item ? item.s : (w.context || ''), tr = item ? item.t || '' : (zh ? w.contextTranslation || '' : '');
+      if (sent) {
+        const span = formSpan(sent, item ? item.form : w.word, zh) || (!zh && w.word.length > 5 ? formSpan(sent, w.word.slice(0, -2), zh) : null);
+        const html = span ? esc(sent.slice(0, span[0])) + '<b>' + esc(sent.slice(span[0], span[1])) + '</b>' + esc(sent.slice(span[1])) : esc(sent);
+        lines.push(`<span class="${zh ? 'zh' : ''}">${html}</span>` + (tr ? `<span>${esc(tr)}</span>` : ''));
+      }
+    }
     const formNote = q.kind === 'gap' && !zh && q.gap.form.toLowerCase() !== w.word.toLowerCase() ? ` <i>(${esc(q.gap.form.toLowerCase())})</i>` : '';
     lines.push(`<span><b${zh ? ' class="zh"' : ''}>${esc(w.word)}</b>${formNote}${w.phonetic ? ' · ' + esc(w.phonetic) : ''}${w.partOfSpeech ? ' · <i>' + esc(w.partOfSpeech) + '</i>' : ''} · ${esc(firstLine(w.definition) || w.definitionZh || '')}</span>`);
     if (!correct && pick) { const pd = firstLine(pick.definition) || pick.definitionZh || ''; lines.push(`<span>You picked <b${zh ? ' class="zh"' : ''}>${esc(pick.word)}</b>${pd ? ': ' + esc(pd) : '.'}</span>`); }
