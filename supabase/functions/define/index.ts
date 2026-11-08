@@ -13,7 +13,7 @@ const CLAUDE_MODEL = "claude-haiku-5-5";
 const STYLE = `You write entries for a reader's personal vocabulary notebook. Words come from books they read on a Kobo (often history, politics and literary non-fiction).
 
 For the given word, return JSON only, no prose, in this exact shape:
-{"word": string, "partOfSpeech": string, "phonetic": string, "definition": string, "note": string, "example": string, "practice": [string, string, string]}
+{"word": string, "partOfSpeech": string, "phonetic": string, "definition": string, "note": string, "example": string}
 
 Rules:
 - word: the dictionary (base) form, lowercase unless a proper noun. "knaves" -> "knave", "extolling" -> "extol", "deluged" -> "deluge". Keep multi-word phrases as phrases ("roman à clef").
@@ -22,11 +22,10 @@ Rules:
 - definition: one sentence in plain modern English, at most about 20 words, never using the word itself. If the word has several senses, give the one most likely meant given the sentence and book provided; otherwise the most common literary sense.
 - note: optional, empty string if nothing useful. One short line on register or tone (archaic, formal, derogatory, admiring) or a brief origin when it genuinely helps remember the meaning. Must be accurate; leave empty if unsure.
 - example: one natural sentence of about 12-25 words that uses the word (in any inflection) in the sense defined, showing how it is typically used. Original, not a quotation; avoid real living people.
-- practice: three more original sentences (12-25 words each) for a fill-in-the-blank quiz, each in a different everyday context from the example and from each other, each using the word exactly once (any inflection) with that occurrence wrapped in double braces, e.g. "The {{knaves}} split the money between them." The surrounding sentence should make the meaning guessable.
 - If the input is not a real English word or is badly misspelled, return {"error": "not_found", "suggestions": [up to 5 likely intended words]}.
 
 Examples:
-{"word":"knave","partOfSpeech":"noun","phonetic":"\\\\ˈnāv\\\\","definition":"A dishonest, unscrupulous man; a rogue.","note":"Archaic. Originally meant a boy or male servant.","example":"Everyone at court knew him for a knave who would sell a friend for a favour.","practice":["Only a {{knave}} would cheat his own grandmother at cards.","The play's villain is a charming {{knave}} who lies to everyone he meets.","She realised too late that her business partner was a {{knave}}."]}
+{"word":"knave","partOfSpeech":"noun","phonetic":"\\\\ˈnāv\\\\","definition":"A dishonest, unscrupulous man; a rogue.","note":"Archaic. Originally meant a boy or male servant.","example":"Everyone at court knew him for a knave who would sell a friend for a favour."}
 {"word":"muckraker","partOfSpeech":"noun","phonetic":"\\\\ˈmək-ˌrā-kər\\\\","definition":"A journalist who exposes corruption or scandal, especially among the powerful.","note":"Popularised by Theodore Roosevelt in 1906, after a character in The Pilgrim's Progress who rakes muck instead of looking up.","example":"The muckraker spent two years digging through the company's records before publishing her exposé."}
 {"word":"dogged","partOfSpeech":"adjective","phonetic":"\\\\ˈdȯ-gəd\\\\","definition":"Showing stubborn persistence despite difficulty.","note":"Usually admiring, as in \\"dogged determination\\".","example":"Her dogged pursuit of the story finally forced the board to release the documents."}
 {"word":"extol","partOfSpeech":"verb","phonetic":"\\\\ik-ˈstōl\\\\","definition":"To praise someone or something enthusiastically.","note":"Formal.","example":"The brochure extols the resort's quiet beaches and award-winning restaurant."}
@@ -37,7 +36,7 @@ const BATCH_RULE = `\n\nBATCH MODE: when given a numbered list of words, return 
 const STYLE_ZH = `You write entries for a reader's personal Chinese vocabulary notebook. The reader is fluent in English and reads Chinese books.
 
 For the given Chinese word or idiom, return JSON only, no prose, in this exact shape:
-{"word": string, "pinyin": string, "partOfSpeech": string, "definition": string, "definitionZh": string, "note": string, "chars": [{"c": string, "m": string}], "example": string, "exampleTranslation": string, "contextTranslation": string, "practice": [{"s": string, "t": string}]}
+{"word": string, "pinyin": string, "partOfSpeech": string, "definition": string, "definitionZh": string, "note": string, "chars": [{"c": string, "m": string}], "example": string, "exampleTranslation": string, "contextTranslation": string}
 
 Rules:
 - word: the word in SIMPLIFIED characters (convert traditional input to simplified).
@@ -50,11 +49,10 @@ Rules:
 - example: one natural sentence in simplified Chinese, about 12-30 characters, using the word in the sense defined. Original, not a quotation; avoid real living people.
 - exampleTranslation: a natural English translation of the example.
 - contextTranslation: a natural English translation of the sentence it appeared in, if one was provided; otherwise "".
-- practice: three more original sentences in simplified Chinese (12-30 characters) for a fill-in-the-blank quiz, each in a different context from the example and from each other, each containing the word exactly once wrapped in double braces, e.g. "两国在第三方的{{斡旋}}下重新开始谈判。"; "t" is a natural English translation.
 - If the input is not a real Chinese word or phrase, return {"error": "not_found", "suggestions": [up to 5 likely intended words]}.
 
 Examples:
-{"word":"斡旋","pinyin":"wòxuán","partOfSpeech":"verb","definition":"To mediate between opposing sides to help them reach an agreement.","definitionZh":"居中调解，使双方达成一致","note":"书面语 · Formal; common in news about diplomacy.","chars":[{"c":"斡","m":"turn"},{"c":"旋","m":"revolve, circle"}],"example":"经过联合国的斡旋，双方终于同意停火。","exampleTranslation":"After mediation by the UN, the two sides finally agreed to a ceasefire.","contextTranslation":"","practice":[{"s":"两国在第三方的{{斡旋}}下重新开始谈判。","t":"With a third party mediating, the two countries resumed talks."},{"s":"经理出面{{斡旋}}，两个部门才停止争吵。","t":"Only after the manager stepped in to mediate did the two departments stop arguing."},{"s":"多亏老朋友从中{{斡旋}}，这笔生意终于谈成了。","t":"Thanks to an old friend acting as go-between, the deal was finally done."}]}
+{"word":"斡旋","pinyin":"wòxuán","partOfSpeech":"verb","definition":"To mediate between opposing sides to help them reach an agreement.","definitionZh":"居中调解，使双方达成一致","note":"书面语 · Formal; common in news about diplomacy.","chars":[{"c":"斡","m":"turn"},{"c":"旋","m":"revolve, circle"}],"example":"经过联合国的斡旋，双方终于同意停火。","exampleTranslation":"After mediation by the UN, the two sides finally agreed to a ceasefire.","contextTranslation":""}
 {"word":"跌宕起伏","pinyin":"diēdàng qǐfú","partOfSpeech":"idiom","definition":"Full of ups and downs; dramatically eventful.","definitionZh":"形容事物变化多端，起落不定","note":"成语 · Four-character idiom, often used of a life or a story.","chars":[{"c":"跌","m":"fall"},{"c":"宕","m":"sway, delay"},{"c":"起","m":"rise"},{"c":"伏","m":"lie low"}],"example":"他的一生跌宕起伏，充满了传奇色彩。","exampleTranslation":"His life was full of ups and downs, like something out of a legend.","contextTranslation":""}`;
 
 const isZh = (s: string) => /\p{Script=Han}/u.test(s);
@@ -117,7 +115,7 @@ async function claude(word: string, context: string, book: string, key: string) 
   if (context) user += `\nSentence it appeared in: ${context}`;
   if (book) user += `\nBook: ${book}`;
   const zh = isZh(word);
-  const text = await askClaude(zh ? STYLE_ZH : STYLE, user, key, zh ? 1100 : 650);
+  const text = await askClaude(zh ? STYLE_ZH : STYLE, user, key, zh ? 700 : 400);
   const m = text?.match(/\{[\s\S]*\}/);
   if (!m) return null;
   const o = JSON.parse(m[0]);
@@ -129,7 +127,7 @@ async function claudeBatch(items: { word: string; book: string }[], key: string,
   const books = [...new Set(items.map((i) => i.book).filter(Boolean))];
   const user = (books.length === 1 ? `Book: ${books[0]}\n` : "") +
     "Words:\n" + items.map((i, n) => `${n + 1}. ${i.word}` + (books.length > 1 && i.book ? ` (from ${i.book})` : "")).join("\n");
-  const text = await askClaude((zh ? STYLE_ZH : STYLE) + BATCH_RULE, user, key, (zh ? 850 : 450) * items.length + 200);
+  const text = await askClaude((zh ? STYLE_ZH : STYLE) + BATCH_RULE, user, key, (zh ? 550 : 300) * items.length + 200);
   const m = text?.match(/\[[\s\S]*\]/);
   if (!m) return items.map(() => null);
   let arr: any[] = [];
@@ -229,23 +227,52 @@ async function claudeExamples(items: { word: string; definition: string; context
   });
 }
 
-const PRACTICE_SYSTEM = `You write fill-in-the-blank quiz sentences for a reader's personal vocabulary notebook.
-For each numbered word, write three original sentences, each in a different everyday context, each using the word exactly once with that occurrence wrapped in double braces. The surrounding sentence should make the meaning guessable without giving it away. Use the sense given by the definition. Avoid real living people.
-English words: 12-25 words per sentence, any inflection inside the braces, e.g. "The {{knaves}} split the money between them." Leave "t" as "".
-Chinese words: simplified Chinese, 12-30 characters, the word itself inside the braces, and "t" a natural English translation.
-Return a JSON array only, one object per word in the same order: {"input": the word exactly as given, "sentences": [{"s": string, "t": string}, ...]}.`;
+const PRACTICE_SYSTEM = `You write fill-in-the-blank quiz items for a reader's personal vocabulary notebook.
+For each numbered word you get its definition, part of speech, and candidate wrong answers (other words from the reader's notebook).
 
-async function claudePractice(items: { word: string; definition: string }[], key: string): Promise<{ s: string; t: string }[][]> {
-  const user = items.map((i, n) => `${n + 1}. ${i.word}` + (i.definition ? `\n   Definition: ${i.definition.split("\n")[0].slice(0, 200)}` : "")).join("\n");
-  const text = await askClaude(PRACTICE_SYSTEM, user, key, 260 * items.length + 200);
+Write three original sentences for the word, each in a different everyday context. Each sentence uses the word exactly once, in whatever grammatical form the sentence naturally needs (past tense, third person, plural, -ing, comparative and so on); vary the forms across the three sentences where the word allows. The sentence should make the meaning guessable without stating it. Use the sense in the definition. Avoid real living people.
+
+For each sentence return:
+- "s": the full sentence, plain text, no markup.
+- "form": the word exactly as it appears in "s".
+- "opts": exactly 3 wrong answers chosen from the candidates, each put into the SAME grammatical form as "form", correctly spelled, as {"word": the candidate exactly as given, "form": the inflected candidate}. If "form" is "extolled", candidates "cajole" and "rankle" become "cajoled" and "rankled"; if "form" is "knaves", "rogue" becomes "rogues". Choose candidates that clearly do NOT fit this sentence, so only one answer is right, preferring the same part of speech.
+- "t": a natural English translation for Chinese words, otherwise "".
+English: 12-25 words per sentence. Chinese: simplified Chinese, 12-30 characters, the word and the wrong answers unchanged (no inflection).
+
+Return a JSON array only, one object per word in the same order: [{"input": the word exactly as given, "sentences": [{"s": string, "form": string, "opts": [{"word": string, "form": string}], "t": string}]}]`;
+
+type PItem = { s: string; form: string; opts: { word: string; form: string }[]; t: string };
+const escRe = (x: string) => x.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+// Keep only items where the form really appears in the sentence and there are 3 distinct wrong answers
+function normItems(list: any): PItem[] {
+  return (Array.isArray(list) ? list : []).map((x: any) => {
+    const s = String(x?.s || "").replace(/\{\{|\}\}|\*\*/g, "").replace(/\s+/g, " ").trim();
+    const form = String(x?.form || "").replace(/\{\{|\}\}|\*\*/g, "").trim();
+    const opts = (Array.isArray(x?.opts) ? x.opts : []).map((o: any) => typeof o === "string" ? { word: o, form: o } : { word: String(o?.word || o?.form || "").trim(), form: String(o?.form || o?.word || "").trim() })
+      .filter((o: any) => o.form && o.form.toLowerCase() !== form.toLowerCase());
+    const seen = new Set<string>(); const uniq = opts.filter((o: any) => { const k = o.form.toLowerCase(); if (seen.has(k)) return false; seen.add(k); return true; });
+    return { s, form, opts: uniq.slice(0, 3), t: String(x?.t || "").trim() };
+  }).filter((x: PItem) => {
+    if (!x.s || !x.form || x.opts.length < 3) return false;
+    return isZh(x.form) ? x.s.includes(x.form) : new RegExp("(^|[^\\p{L}])" + escRe(x.form) + "($|[^\\p{L}])", "iu").test(x.s);
+  }).slice(0, 3);
+}
+
+async function claudePractice(items: { word: string; definition: string; pos: string; candidates: string[] }[], key: string): Promise<PItem[][]> {
+  const user = items.map((i, n) => `${n + 1}. ${i.word}` +
+    (i.pos ? ` (${i.pos})` : "") +
+    (i.definition ? `\n   Definition: ${i.definition.split("\n")[0].slice(0, 200)}` : "") +
+    `\n   Candidates: ${i.candidates.join(", ")}`).join("\n");
+  const text = await askClaude(PRACTICE_SYSTEM, user, key, 420 * items.length + 300);
   const m = text?.match(/\[[\s\S]*\]/);
-  if (!m) return items.map(() => []);
   let arr: any[] = [];
-  try { arr = JSON.parse(m[0]); } catch { return items.map(() => []); }
-  return items.map((it, n) => {
-    const o = arr.find((x) => x && String(x.input || "") === it.word) || arr[n];
-    return normPractice(o?.sentences);
+  try { arr = m ? JSON.parse(m[0]) : []; } catch { arr = []; }
+  const out = items.map((it, n) => {
+    const o = arr.find((x) => x && String(x.input || "").toLowerCase() === it.word.toLowerCase()) || arr[n];
+    return normItems(o?.sentences);
   });
+  if (out.some((x) => !x.length)) console.error("practice: some words got no valid items", JSON.stringify(items.map((i) => i.word)), String(text || "").slice(0, 1500));
+  return out;
 }
 
 const cleanWord = (s: unknown) => String(s || "").trim().replace(/^[^\p{L}]+|[^\p{L}]+$/gu, "").toLowerCase().slice(0, 60);
@@ -257,12 +284,14 @@ Deno.serve(async (req) => {
     const aKey = Deno.env.get("ANTHROPIC_API_KEY");
     const mKey = Deno.env.get("MW_API_KEY");
 
-    // Practice sentences (fill-the-gap pools): { practice: [{ word, definition }] } -> { results: [{ input, practice: [{s,t}] }] }
+    // Fill-the-gap items: { practice: [{ word, definition, pos, candidates }] } -> { results: [{ input, practice: [{ s, form, opts, t }] }] }
     if (Array.isArray(body.practice)) {
       const items = body.practice.slice(0, 10).map((i: any) => ({
         word: String(i?.word || "").trim().slice(0, 60),
         definition: String(i?.definition || "").trim().slice(0, 400),
-      })).filter((i: any) => i.word);
+        pos: String(i?.pos || "").trim().slice(0, 30),
+        candidates: (Array.isArray(i?.candidates) ? i.candidates : []).map((c: any) => String(c || "").trim().slice(0, 60)).filter(Boolean).slice(0, 8),
+      })).filter((i: any) => i.word && i.candidates.length >= 3);
       if (!aKey) return json({ results: items.map((i: any) => ({ input: i.word, practice: [] })), error: "no_claude_key" });
       const got = await claudePractice(items, aKey).catch((e) => { console.error(e); return items.map(() => []); });
       return json({ results: items.map((i: any, n: number) => ({ input: i.word, practice: got[n] })) });

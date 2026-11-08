@@ -498,7 +498,7 @@ nav.tabs button[aria-current="page"] { color: var(--accent) }
 <script>
 /* Self-update: compare this page's version with version.json (never cached) and reload once if newer. */
 (() => {
-  const APP_VERSION = '11';
+  const APP_VERSION = '12';
   async function check() {
     try {
       const r = await fetch('version.json?t=' + Date.now(), { cache: 'no-store' });
@@ -1116,18 +1116,27 @@ nav.tabs button[aria-current="page"] { color: var(--accent) }
   }
 
   // ----- sentence pools
-  const needsPool = w => (w.lang !== 'zh' || PRACTICE_AI_ZH) && (!w.practice.length || w.practiceSeen >= w.practice.length);
+  const validItem = p => p && p.s && p.form && Array.isArray(p.opts) && p.opts.length >= 3;
+  const poolOf = w => (w.practice || []).filter(validItem);
+  const needsPool = w => (w.lang !== 'zh' || PRACTICE_AI_ZH) && (!poolOf(w).length || (w.practiceSeen || 0) >= poolOf(w).length);
+  // Other words from the library for Claude to choose wrong answers from (same language, same part of speech first)
+  function candidatesFor(w) {
+    const pos = (w.partOfSpeech || '').toLowerCase();
+    const pool = words.filter(x => (x.lang || 'en') === (w.lang || 'en') && x.id !== w.id && x.word.toLowerCase() !== w.word.toLowerCase());
+    const same = shuffle(pool.filter(x => pos && (x.partOfSpeech || '').toLowerCase() === pos)), rest = shuffle(pool.filter(x => !same.includes(x)));
+    return [...new Set([...same, ...rest].map(x => x.word))].slice(0, 8);
+  }
   async function ensurePools(list) {
     const todo = list.filter(needsPool);
     for (let i = 0; i < todo.length; i += 10) {
       const batch = todo.slice(i, i + 10);
       status($('pStatus'), `Writing practice sentences… ${Math.min(i + batch.length, todo.length)} of ${todo.length}`);
       try {
-        const { data, error } = await sb.functions.invoke('define', { body: { practice: batch.map(w => ({ word: w.word, definition: firstLine(w.definition) || w.definitionZh })) } });
+        const { data, error } = await sb.functions.invoke('define', { body: { practice: batch.map(w => ({ word: w.word, definition: firstLine(w.definition) || w.definitionZh, pos: w.partOfSpeech || '', candidates: candidatesFor(w) })) } });
         if (error || !data || !Array.isArray(data.results)) continue;
         await Promise.all(batch.map(async (w, j) => {
-          const p = data.results[j] && data.results[j].practice;
-          if (!p || !p.length) return;
+          const p = ((data.results[j] && data.results[j].practice) || []).filter(validItem);
+          if (!p.length) return;
           const { error } = await sb.from('words').update({ practice_sentences: p, practice_seen: 0 }).eq('id', w.id);
           if (!error) { w.practice = p; w.practiceSeen = 0; }
         }));
@@ -1135,19 +1144,17 @@ nav.tabs button[aria-current="page"] { color: var(--accent) }
     }
     status($('pStatus'));
   }
-  // Mark the word inside a sentence the reader wrote or imported, as {{form}}.
-  function markSentence(sent, w) {
-    sent = String(sent || '').trim(); if (!sent) return null;
-    if (w.lang === 'zh') { const i = sent.indexOf(w.word); return i < 0 ? null : sent.slice(0, i) + '{{' + w.word + '}}' + sent.slice(i + w.word.length); }
-    const tryRe = stem => { const m = new RegExp('(^|[^\\p{L}])(' + reEsc(stem) + '\\p{L}*)', 'iu').exec(sent); return m ? sent.slice(0, m.index + m[1].length) + '{{' + m[2] + '}}' + sent.slice(m.index + m[0].length) : null; };
-    return tryRe(w.word) || (w.word.length > 5 ? tryRe(w.word.slice(0, w.word.length - 2)) : null);
-  }
-  // Pick the next sentence for a word: AI pool first (rotating), then its own example.
+  // Fill the gap uses only Claude's practice sentences (rotating through the word's pool).
   function gapFor(w) {
-    const pool = (w.practice || []).filter(p => /\{\{[^{}]+\}\}/.test(p.s));
-    if (pool.length) { const i = (w.practiceSeen || 0) % pool.length; return { s: pool[i].s, t: pool[i].t || '', next: (w.practiceSeen || 0) + 1 }; }
-    const m = markSentence(w.context, w);
-    return m ? { s: m, t: w.lang === 'zh' ? w.contextTranslation || '' : '', next: null } : null;
+    const pool = poolOf(w); if (!pool.length) return null;
+    const i = (w.practiceSeen || 0) % pool.length, p = pool[i];
+    return { s: p.s, form: p.form, opts: p.opts.slice(0, 3), t: p.t || '', next: (w.practiceSeen || 0) + 1 };
+  }
+  // Where the word form sits in the sentence: [start, end]
+  function formSpan(sent, form, zh) {
+    if (zh) { const i = sent.indexOf(form); return i < 0 ? null : [i, i + form.length]; }
+    const m = new RegExp('(^|[^\\p{L}])(' + reEsc(form) + ')(?=$|[^\\p{L}])', 'iu').exec(sent);
+    return m ? [m.index + m[1].length, m.index + m[1].length + m[2].length] : null;
   }
   function distractors(w) {
     const pool = words.filter(x => inLang(x) && x.id !== w.id && x.word.toLowerCase() !== w.word.toLowerCase());
@@ -1188,14 +1195,25 @@ nav.tabs button[aria-current="page"] { color: var(--accent) }
     finishSession();
   }
   function buildQuestion(w, mode) {
-    const others = distractors(w); if (!others) return null;
-    const gap = mode !== 'meaning' ? gapFor(w) : null;
+    const gap0 = mode !== 'meaning' ? gapFor(w) : null;
+    const gap = gap0 && formSpan(gap0.s, gap0.form, w.lang === 'zh') ? gap0 : null;
     const def = firstLine(w.definition) || w.definitionZh;
     let kind = mode === 'gap' ? 'gap' : mode === 'meaning' ? 'meaning' : (gap && (!def || Math.random() < 0.6) ? 'gap' : 'meaning');
     if (kind === 'gap' && !gap) kind = def ? 'meaning' : null;
     if (kind === 'meaning' && !def) kind = gap ? 'gap' : null;
     if (!kind) return null;
-    return { kind, gap, def, options: shuffle([w, ...others]) };
+    let options;
+    if (kind === 'gap') {
+      // Options in the form the sentence needs; all capitalised if the gap starts the sentence
+      const atStart = formSpan(gap.s, gap.form, w.lang === 'zh')[0] === 0;
+      const cap = x => atStart ? x.charAt(0).toUpperCase() + x.slice(1) : x.charAt(0).toLowerCase() + x.slice(1);
+      options = shuffle([{ label: cap(gap.form), w, correct: true },
+        ...gap.opts.map(o => ({ label: cap(o.form), w: words.find(x => x.word.toLowerCase() === String(o.word).toLowerCase()) || { word: o.word }, correct: false }))]);
+    } else {
+      const others = distractors(w); if (!others) return null;
+      options = shuffle([{ label: w.word, w, correct: true }, ...others.map(x => ({ label: x.word, w: x, correct: false }))]);
+    }
+    return { kind, gap, def, options };
   }
   function renderQuestion(it, q) {
     const { w } = it, zh = w.lang === 'zh', total = sess.items.length;
@@ -1205,22 +1223,23 @@ nav.tabs button[aria-current="page"] { color: var(--accent) }
     const pq = $('pQ'); pq.classList.toggle('def', q.kind === 'meaning');
     if (q.kind === 'gap') {
       const blank = zh ? '<span class="gap">　　</span>' : '<span class="gap"> </span>';
-      pq.innerHTML = `<span class="${zh ? 'zh' : ''}"${zh ? ' lang="zh-Hans"' : ''}>${esc(q.gap.s).replace(/\{\{[^{}]+\}\}/, blank)}</span>`;
+      const [a, b] = formSpan(q.gap.s, q.gap.form, zh);
+      pq.innerHTML = `<span class="${zh ? 'zh' : ''}"${zh ? ' lang="zh-Hans"' : ''}>${esc(q.gap.s.slice(0, a))}${blank}${esc(q.gap.s.slice(b))}</span>`;
     } else {
       let d = q.def; const re = new RegExp(reEsc(w.word), 'gi'); d = d.replace(re, '___');
       pq.textContent = d.length > 220 ? d.slice(0, 218) + '…' : d;
     }
-    $('pOpts').innerHTML = q.options.map((o, k) => `<button class="popt" data-k="${k}"><span class="${zh ? 'zh' : ''}"${zh ? ' lang="zh-Hans"' : ''}>${esc(o.word)}</span></button>`).join('');
+    $('pOpts').innerHTML = q.options.map((o, k) => `<button class="popt" data-k="${k}"><span class="${zh ? 'zh' : ''}"${zh ? ' lang="zh-Hans"' : ''}>${esc(o.label)}</span></button>`).join('');
     $('pFeed').hidden = true; $('pNext').hidden = true;
     sess.cur = { it, q };
   }
   $('pOpts').addEventListener('click', e => {
     const b = e.target.closest('.popt'); if (!b || !sess || !sess.cur || sess.cur.done) return;
-    const { it, q } = sess.cur, w = it.w, pick = q.options[+b.dataset.k], correct = pick.id === w.id;
+    const { it, q } = sess.cur, w = it.w, opt = q.options[+b.dataset.k], pick = opt.w, correct = opt.correct;
     sess.cur.done = true;
     document.querySelectorAll('.popt').forEach((x, k) => {
       x.disabled = true;
-      if (q.options[k].id === w.id) { x.classList.add('ok'); x.insertAdjacentHTML('beforeend', '<svg class="i"><use href="#i-check"/></svg>'); }
+      if (q.options[k].correct) { x.classList.add('ok'); x.insertAdjacentHTML('beforeend', '<svg class="i"><use href="#i-check"/></svg>'); }
       else if (x === b) { x.classList.add('bad'); x.insertAdjacentHTML('beforeend', '<svg class="i"><use href="#i-x"/></svg>'); }
     });
     const box = recordAnswer(w, correct, q.kind, { retry: it.retry, practiceSeen: q.kind === 'gap' && q.gap.next != null && !it.retry ? q.gap.next : null });
@@ -1230,11 +1249,13 @@ nav.tabs button[aria-current="page"] { color: var(--accent) }
     const zh = w.lang === 'zh';
     const lines = [];
     if (q.kind === 'gap') {
-      const filled = esc(q.gap.s).replace(/\{\{([^{}]+)\}\}/, '<b>$1</b>');
+      const [a, b2] = formSpan(q.gap.s, q.gap.form, zh);
+      const filled = esc(q.gap.s.slice(0, a)) + '<b>' + esc(q.gap.s.slice(a, b2)) + '</b>' + esc(q.gap.s.slice(b2));
       lines.push(`<span class="${zh ? 'zh' : ''}">${filled}</span>` + (q.gap.t ? `<span>${esc(q.gap.t)}</span>` : ''));
     }
-    lines.push(`<span><b${zh ? ' class="zh"' : ''}>${esc(w.word)}</b>${w.phonetic ? ' · ' + esc(w.phonetic) : ''}${w.partOfSpeech ? ' · <i>' + esc(w.partOfSpeech) + '</i>' : ''} · ${esc(firstLine(w.definition) || w.definitionZh || '')}</span>`);
-    if (!correct && pick) lines.push(`<span>You picked <b${zh ? ' class="zh"' : ''}>${esc(pick.word)}</b>: ${esc(firstLine(pick.definition) || pick.definitionZh || '')}</span>`);
+    const formNote = q.kind === 'gap' && !zh && q.gap.form.toLowerCase() !== w.word.toLowerCase() ? ` <i>(${esc(q.gap.form.toLowerCase())})</i>` : '';
+    lines.push(`<span><b${zh ? ' class="zh"' : ''}>${esc(w.word)}</b>${formNote}${w.phonetic ? ' · ' + esc(w.phonetic) : ''}${w.partOfSpeech ? ' · <i>' + esc(w.partOfSpeech) + '</i>' : ''} · ${esc(firstLine(w.definition) || w.definitionZh || '')}</span>`);
+    if (!correct && pick) { const pd = firstLine(pick.definition) || pick.definitionZh || ''; lines.push(`<span>You picked <b${zh ? ' class="zh"' : ''}>${esc(pick.word)}</b>${pd ? ': ' + esc(pd) : '.'}</span>`); }
     if (box != null) lines.push(`<span>${correct ? (box >= MASTERED_BOX ? 'Mastered. ' : '') + 'Next review ' + (INTERVALS[box] === 1 ? 'tomorrow' : `in ${INTERVALS[box]} days`) + '.' : 'It comes back at the end of this session, and again tomorrow.'}</span>`);
     $('pFeed').innerHTML = lines.join(''); $('pFeed').hidden = false;
     $('pNext').hidden = false; $('pNext').focus();
